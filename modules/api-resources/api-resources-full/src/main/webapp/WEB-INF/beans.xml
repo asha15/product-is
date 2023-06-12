@@ -46,10 +46,10 @@
     <import resource="classpath:META-INF/cxf/authenticators-server-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/secret-management-server-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/branding-preference-server-v1-cxf.xml"/>
-    <import resource="classpath:META-INF/cxf/org-mgt-server-v1-cxf.xml"/>
-    <import resource="classpath:META-INF/cxf/org-mgt-role-mgt-server-v1-cxf.xml"/>
+    <import resource="classpath:META-INF/cxf/input-validation-server-v1-cxf.xml"/>
 
     <import resource="classpath:META-INF/cxf/identity-governance-server-v1-cxf.xml"/>
+    <import resource="classpath:META-INF/cxf/admin-advisory-management-server-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/user-store-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/tenant-management-server-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/cors-server-v1-cxf.xml"/>
@@ -58,8 +58,6 @@
 
     <!-- Legacy identity APIs   -->
     <import resource="classpath:META-INF/cxf/config-mgt-server-v1-cxf.xml"/>
-    <import resource="classpath:META-INF/cxf/uma-permission-v1-cxf.xml"/>
-    <import resource="classpath:META-INF/cxf/uma-resource-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/user-recovery-v0-9-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/user-governance-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/user-fido2-v2-cxf.xml"/>
@@ -67,6 +65,9 @@
     <import resource="classpath:META-INF/cxf/oauth2-scope-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/consent-mgt-v1-cxf.xml"/>
     <import resource="classpath:META-INF/cxf/auth-v1-1-cfx.xml"/>
+    <import resource="classpath:META-INF/cxf/extension-mgt-server-v1-cxf.xml"/>
+    <import resource="classpath:META-INF/cxf/idv-provider-v1-cxf.xml"/>
+    <import resource="classpath:META-INF/cxf/idv-v1-cxf.xml"/>
 
     <context:property-placeholder/>
     <context:annotation-config/>
@@ -84,6 +85,7 @@
             <bean class="org.wso2.carbon.identity.rest.api.server.claim.management.v1.ClaimManagementApi"/>
             <bean class="org.wso2.carbon.identity.rest.api.server.email.template.v1.EmailApi"/>
             <bean class="org.wso2.carbon.identity.api.server.identity.governance.v1.IdentityGovernanceApi"/>
+            <bean class="org.wso2.carbon.identity.api.server.admin.advisory.management.v1.AdminAdvisoryManagementApi"/>
             <bean class="org.wso2.carbon.identity.api.server.application.management.v1.ApplicationsApi"/>
             <bean class="org.wso2.carbon.identity.api.server.userstore.v1.UserstoresApi"/>
             <bean class="org.wso2.carbon.identity.api.server.permission.management.v1.PermissionManagementApi"/>
@@ -101,8 +103,9 @@
             <bean class="org.wso2.carbon.identity.api.server.secret.management.v1.SecretsApi"/>
             <bean class="org.wso2.carbon.identity.api.server.secret.management.v1.SecretTypeApi"/>
             <bean class="org.wso2.carbon.identity.api.server.branding.preference.management.v1.BrandingPreferenceApi"/>
-            <bean class="org.wso2.carbon.identity.organization.management.endpoint.OrganizationsApi"/>
-            <bean class="org.wso2.carbon.identity.organization.management.role.management.endpoint.OrganizationsApi"/>
+            <bean class="org.wso2.carbon.identity.api.server.input.validation.v1.ValidationRulesApi"/>
+            <bean class="org.wso2.carbon.identity.api.server.extension.management.v1.ExtensionsApi"/>
+            <bean class="org.wso2.carbon.identity.api.server.idv.provider.v1.IdvProvidersApi"/>
         </jaxrs:serviceBeans>
         <jaxrs:providers>
             <bean class="com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider">
@@ -125,23 +128,26 @@
     </jaxrs:server>
     <jaxrs:server id="users" address="/users/v1">
         <jaxrs:serviceBeans>
-            <bean class="org.wso2.carbon.identity.rest.api.user.association.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.authorized.apps.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.challenge.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.approval.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.session.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.fido2.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.totp.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.backupcode.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.mfa.v1.MeApi"/>
             <bean class="org.wso2.carbon.identity.rest.api.user.application.v1.MeApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.recovery.v1.RecoveryApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.challenge.v1.UserIdApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.session.v1.UserIdApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.authorized.apps.v1.UserIdApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.approval.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.association.v1.MeApi"/>
             <bean class="org.wso2.carbon.identity.rest.api.user.association.v1.UserIdApi"/>
-            <bean class="org.wso2.carbon.identity.rest.api.user.functionality.v1.UserIdApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.authorized.apps.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.authorized.apps.v1.UserIdApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.backupcode.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.challenge.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.challenge.v1.UserIdApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.fido2.v1.MeApi"/>
             <bean class="org.wso2.carbon.identity.rest.api.user.functionality.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.functionality.v1.UserIdApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.mfa.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.recovery.v1.RecoveryApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.session.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.session.v1.SessionsApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.session.v1.UserIdApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.totp.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.idv.v1.MeApi"/>
+            <bean class="org.wso2.carbon.identity.rest.api.user.idv.v1.DefaultApi"/>
         </jaxrs:serviceBeans>
         <jaxrs:providers>
             <bean class="com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider">
@@ -205,22 +211,6 @@
             <bean class="org.wso2.carbon.identity.entitlement.endpoint.filter.EntitlementExceptionMapper"/>
         </jaxrs:providers>
     </jaxrs:server>
-    <jaxrs:server id="umaPermission" address="/identity/oauth2/uma/permission/v1.0">
-        <jaxrs:serviceBeans>
-            <bean class="org.wso2.carbon.identity.oauth.uma.permission.endpoint.PermissionApi"/>
-        </jaxrs:serviceBeans>
-        <jaxrs:providers>
-            <bean class="com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider"/>
-        </jaxrs:providers>
-    </jaxrs:server>
-    <jaxrs:server id="umaResource" address="/identity/oauth2/uma/resourceregistration/v1.0">
-        <jaxrs:serviceBeans>
-            <bean class="org.wso2.carbon.identity.oauth.uma.resource.endpoint.ResourceRegistrationApi"/>
-        </jaxrs:serviceBeans>
-        <jaxrs:providers>
-            <bean class="com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider"/>
-        </jaxrs:providers>
-    </jaxrs:server>
     <jaxrs:server id="recovery" address="/identity/recovery/v0.9">
         <jaxrs:serviceBeans>
             <bean class="org.wso2.carbon.identity.recovery.endpoint.ClaimsApi"/>
@@ -273,6 +263,7 @@
         </jaxrs:serviceBeans>
         <jaxrs:providers>
             <bean class="com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider"/>
+            <bean class="org.wso2.carbon.identity.oauth2.dcr.endpoint.exmapper.JsonProcessingExceptionMapper"/>
             <bean class="com.fasterxml.jackson.jaxrs.base.JsonMappingExceptionMapper"/>
             <bean class="com.fasterxml.jackson.jaxrs.base.JsonParseExceptionMapper"/>
         </jaxrs:providers>

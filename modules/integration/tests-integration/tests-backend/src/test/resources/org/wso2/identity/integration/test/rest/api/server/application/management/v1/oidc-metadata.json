@@ -27,15 +27,11 @@
       },
       {
         "name": "urn:ietf:params:oauth:grant-type:device_code",
-        "displayName": "urn:ietf:params:oauth:grant-type:device_code"
+        "displayName": "Device Code"
       },
       {
         "name": "authorization_code",
         "displayName": "Code"
-      },
-      {
-        "name": "urn:ietf:params:oauth:grant-type:uma-ticket",
-        "displayName": "urn:ietf:params:oauth:grant-type:uma-ticket"
       },
       {
         "name": "account_switch",

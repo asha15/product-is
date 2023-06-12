@@ -75,7 +75,7 @@ jobs:
           echo ""
           echo 'Updating dependencies'
           echo "=========================================================="
-          mvn versions:update-properties -U -DgenerateBackupPoms=false -Dincludes=org.wso2.carbon.identity.*,org.wso2.carbon.extension.identity.*,org.wso2.identity.*,org.wso2.carbon.consent.*,org.wso2.carbon.healthcheck.*,org.wso2.carbon.utils,org.wso2.charon,org.apache.rampart.wso2,org.apache.ws.security.wso2
+          mvn versions:update-properties -U -DgenerateBackupPoms=false -DallowMajorUpdates=false -Dincludes=org.wso2.carbon.identity.*,org.wso2.carbon.extension.identity.*,org.wso2.identity.*,org.wso2.carbon.consent.*,org.wso2.carbon.healthcheck.*,org.wso2.carbon.utils,org.wso2.charon,org.apache.rampart.wso2,org.apache.ws.security.wso2
           echo ""
           echo 'Available updates'
           echo "=========================================================="
@@ -99,7 +99,7 @@ jobs:
           PR_BUILD_RESULT_LOG=$(echo $PR_BUILD_RESULT_LOG_TEMP)
           echo "::warning::$PR_BUILD_RESULT_LOG"
           PR_BUILD_SUCCESS_COUNT=$(grep -o -i "\[INFO\] BUILD SUCCESS" mvn-build.log | wc -l)
-          if [ "$PR_BUILD_SUCCESS_COUNT" != "3" ]; then
+          if [ "$PR_BUILD_SUCCESS_COUNT" != "1" ]; then
             echo "PR BUILD not successfull. Aborting."
             echo "::error::PR BUILD not successfull. Check artifacts for logs."
             exit 1

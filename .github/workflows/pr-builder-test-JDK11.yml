@@ -18,7 +18,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Print Input
@@ -58,6 +58,12 @@ jobs:
             ~/.m2
             !~/.m2/repository/org/wso2/is/wso2is
           key: ${{ runner.os }}-pr-builder-${{ env.CURRENT_MONTH }}
+      - name: Setup pnpm
+        id: setup-pnpm
+        uses: pnpm/action-setup@v2.1.0
+        with:
+          version: latest
+          run_install: false
       - name: Run PR builder
         id: builder_step
         env:
@@ -66,7 +72,7 @@ jobs:
           JAVA_8_HOME: ${{env.J8HOME}}
           JAVA_11_HOME: ${{env.J11HOME}}
         run: |
-          wget https://raw.githubusercontent.com/nirmal101/product-is/master/.github/scripts/pr-builder.sh
+          wget https://raw.githubusercontent.com/wso2/product-is/master/.github/scripts/pr-builder.sh
           bash pr-builder.sh
       - name: Archive PR diff file
         if: always()
