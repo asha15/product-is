@@ -1,20 +1,19 @@
 /*
- * Copyright (c) 2019, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2019, WSO2 LLC. (https://www.wso2.com).
  *
- * WSO2 Inc. licenses this file to you under the Apache License,
+ * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.wso2.identity.integration.test.oauth2;
@@ -41,13 +40,18 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.wso2.carbon.automation.engine.context.TestUserMode;
-import org.wso2.carbon.identity.application.common.model.xsd.ServiceProvider;
-import org.wso2.carbon.identity.oauth.stub.dto.OAuthConsumerAppDTO;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationPatchModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationResponseModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.AssociatedRolesConfig;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.OpenIDConnectConfiguration;
+import org.wso2.identity.integration.test.utils.CarbonUtils;
 import org.wso2.identity.integration.test.utils.OAuth2Constant;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Test cases to check the functionality of the Permission based scope validator.
@@ -55,24 +59,29 @@ import java.net.URISyntaxException;
 public class PermissionBasedScopeValidatorTestCase extends OAuth2ServiceAbstractIntegrationTest {
 
     private static final String INTROSPECT_SCOPE = "internal_application_mgt_view";
+    private static final String INTROSPECT_SCOPE_IN_NEW_AUTHZ_RUNTIME = "internal_oauth2_introspect";
     private static final String SYSTEM_SCOPE = "SYSTEM";
     private static final String CALLBACK_URL = "https://localhost/callback";
     private CloseableHttpClient client;
+    private String applicationId;
+    private static boolean isLegacyRuntimeEnabled;
 
     @BeforeClass(alwaysRun = true)
     public void testInit() throws Exception {
 
         super.init(TestUserMode.SUPER_TENANT_USER);
+        isLegacyRuntimeEnabled = CarbonUtils.isLegacyAuthzRuntimeEnabled();
         createOauthApplication();
     }
 
     @AfterClass(alwaysRun = true)
     public void atEnd() throws Exception {
 
-        deleteApplication();
-        removeOAuthApplicationData();
+        deleteApp(applicationId);
         consumerKey = null;
         consumerSecret = null;
+        applicationId = null;
+        restClient.closeHttpClient();
     }
 
     @Test(groups = "wso2.is", description = "Testing secured API without authentication.")
@@ -94,7 +103,13 @@ public class PermissionBasedScopeValidatorTestCase extends OAuth2ServiceAbstract
             dependsOnMethods = "testValidateTokenWithoutScope")
     public void testValidateTokenWithValidScope() throws Exception {
 
-        Assert.assertTrue(getTokenAndValidate(new Scope(INTROSPECT_SCOPE)), "Introspection endpoint cannot call with the valid scope");
+        if (isLegacyRuntimeEnabled) {
+            Assert.assertTrue(getTokenAndValidate(new Scope(INTROSPECT_SCOPE)),
+                    "Introspection endpoint cannot call with the valid scope");
+        } else {
+            Assert.assertTrue(getTokenAndValidate(new Scope(INTROSPECT_SCOPE_IN_NEW_AUTHZ_RUNTIME)),
+                    "Introspection endpoint cannot call with the valid scope");
+        }
     }
 
     @Test(groups = "wso2.is", description = "Request access token with valid system scope and validate it.",
@@ -117,12 +132,12 @@ public class PermissionBasedScopeValidatorTestCase extends OAuth2ServiceAbstract
 
         try {
             Secret password = new Secret(userInfo.getPassword());
-            AuthorizationGrant passwordGrant = new ResourceOwnerPasswordCredentialsGrant(userInfo.getUserName(),
-                    password);
+            AuthorizationGrant passwordGrant = new ResourceOwnerPasswordCredentialsGrant(
+                    userInfo.getUserNameWithoutDomain(), password);
             ClientID clientID = new ClientID(consumerKey);
             Secret clientSecret = new Secret(consumerSecret);
             ClientAuthentication clientAuth = new ClientSecretBasic(clientID, clientSecret);
-            URI tokenEndpoint = new URI(OAuth2Constant.ACCESS_TOKEN_ENDPOINT);
+            URI tokenEndpoint = new URI(getTenantQualifiedURL(OAuth2Constant.ACCESS_TOKEN_ENDPOINT, tenantInfo.getDomain()));
             TokenRequest request = new TokenRequest(tokenEndpoint, clientAuth, passwordGrant, scope);
 
             HTTPResponse tokenHTTPResp = request.toHTTPRequest().send();
@@ -154,10 +169,26 @@ public class PermissionBasedScopeValidatorTestCase extends OAuth2ServiceAbstract
 
     private void createOauthApplication() throws Exception {
 
-        OAuthConsumerAppDTO oAuthConsumerAppDTO = getBasicOAuthApp(CALLBACK_URL);
-        ServiceProvider serviceProvider = registerServiceProviderWithOAuthInboundConfigs(oAuthConsumerAppDTO);
-        Assert.assertNotNull(serviceProvider, "OAuth App creation failed.");
+        ApplicationResponseModel application = getBasicOAuthApplication(CALLBACK_URL);
+        Assert.assertNotNull(application, "OAuth App creation failed.");
+
+        OpenIDConnectConfiguration  oidcInboundConfig = getOIDCInboundDetailsOfApplication(application.getId());
+        consumerKey = oidcInboundConfig.getClientId();
         Assert.assertNotNull(consumerKey, "Consumer Key is null.");
+        consumerSecret = oidcInboundConfig.getClientSecret();
         Assert.assertNotNull(consumerSecret, "Consumer Secret is null.");
+
+        applicationId = application.getId();
+        if (!isLegacyRuntimeEnabled) {
+            // Authorize few system APIs.
+            authorizeSystemAPIs(applicationId,
+                    new ArrayList<>(Arrays.asList("/api/server/v1/tenants", "/scim2/Users", "/oauth2/introspect")));
+            // Associate roles.
+            ApplicationPatchModel applicationPatch = new ApplicationPatchModel();
+            AssociatedRolesConfig associatedRolesConfig =
+                    new AssociatedRolesConfig().allowedAudience(AssociatedRolesConfig.AllowedAudienceEnum.ORGANIZATION);
+            applicationPatch = applicationPatch.associatedRoles(associatedRolesConfig);
+            updateApplication(applicationId, applicationPatch);
+        }
     }
 }

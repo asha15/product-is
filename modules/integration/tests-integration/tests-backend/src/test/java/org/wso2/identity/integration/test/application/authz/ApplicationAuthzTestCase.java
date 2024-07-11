@@ -24,8 +24,13 @@ import org.apache.axis2.context.ConfigurationContextFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.cookie.CookieSpecProvider;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.cookie.RFC6265CookieSpecProvider;
 import org.apache.http.util.EntityUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -50,9 +55,9 @@ public class ApplicationAuthzTestCase extends AbstractApplicationAuthzTestCase {
     private static final String AZ_TEST_ROLE = "Internal/azTestRole";
     private static final String HTTP_REDIRECT = "HTTP-Redirect";
     private static final String AZ_TEST_USER = "azTestUser";
-    private static final String AZ_TEST_USER_PW = "azTest123";
+    private static final String AZ_TEST_USER_PW = "azTest@123";
     private static final String NON_AZ_TEST_USER = "nonAzTestUser";
-    private static final String NON_AZ_TEST_USER_PW = "nonAzTest123";
+    private static final String NON_AZ_TEST_USER_PW = "nonAzTest@123";
     private static final Log log = LogFactory.getLog(ApplicationAuthzTestCase.class);
     private static final String APPLICATION_NAME = "travelocity.com";
     private static final String POLICY_ID = "spAuthPolicy";
@@ -99,8 +104,20 @@ public class ApplicationAuthzTestCase extends AbstractApplicationAuthzTestCase {
         remoteUSMServiceClient = new RemoteUserStoreManagerServiceClient(backendURL, sessionCookie);
         entitlementPolicyClient = new EntitlementPolicyServiceClient(backendURL, sessionCookie);
 
-        httpClientAzUser = HttpClientBuilder.create().setDefaultCookieStore(new BasicCookieStore()).build();
-        httpClientNonAzUser = HttpClientBuilder.create().setDefaultCookieStore(new BasicCookieStore()).build();
+        cookieSpecRegistry = RegistryBuilder.<CookieSpecProvider>create()
+                .register(CookieSpecs.DEFAULT, new RFC6265CookieSpecProvider())
+                .build();
+        requestConfig = RequestConfig.custom()
+                .setCookieSpec(CookieSpecs.DEFAULT)
+                .build();
+        httpClientAzUser = HttpClientBuilder.create().setDefaultCookieStore(new BasicCookieStore())
+                .setDefaultRequestConfig(requestConfig)
+                .setDefaultCookieSpecRegistry(cookieSpecRegistry)
+                .build();
+        httpClientNonAzUser = HttpClientBuilder.create().setDefaultCookieStore(new BasicCookieStore())
+                .setDefaultRequestConfig(requestConfig)
+                .setDefaultCookieSpecRegistry(cookieSpecRegistry)
+                .build();
 
         createRole(AZ_TEST_ROLE);
         createUser(AZ_TEST_USER, AZ_TEST_USER_PW, new String[]{AZ_TEST_ROLE});

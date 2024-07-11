@@ -26,10 +26,16 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.config.Lookup;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.cookie.CookieSpecProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.cookie.RFC6265CookieSpecProvider;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.testng.Assert;
@@ -69,7 +75,6 @@ import java.util.List;
 
 public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest {
 
-    private static final String TENANT_DOMAIN_PARAM = "tenantDomain";
     private static final Log log = LogFactory.getLog(ChallengeQuestionPostAuthnHandlerTestCase.class);
     // SAML Application attributes
     private static final String USER_AGENT = "Apache-HttpClient/4.2.5 (java 1.5)";
@@ -178,7 +183,7 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
             groups = "wso2.is",
             dependsOnMethods = {"testAddSP"})
     public void testLoginWithDefaultSetting() {
-        try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+        try (CloseableHttpClient httpClient = getClosableHTTPClient()) {
             HttpResponse response;
             // Update resident IDP property for forcing challenge questions
             response = Utils.sendGetRequest(String.format(SAML_SSO_LOGIN_URL, config.getApp().getArtifact(), config
@@ -229,7 +234,7 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
             groups = "wso2.is",
             dependsOnMethods = {"testAddSP"})
     public void testLoginWithDisabledSetting() {
-        try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+        try (CloseableHttpClient httpClient = getClosableHTTPClient()) {
             HttpResponse response;
             // Update resident IDP property for forcing challenge questions
             updateResidentIDPProperty(superTenantResidentIDP, FORCE_ADD_PW_RECOVERY_QUESTION, "false", true);
@@ -280,7 +285,7 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
             groups = "wso2.is",
             dependsOnMethods = {"testAddSP"})
     public void testLoginWithEnabledSetting() {
-        try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+        try (CloseableHttpClient httpClient = getClosableHTTPClient()) {
             HttpResponse response;
             // Update resident IDP property for forcing challenge questions
             updateResidentIDPProperty(superTenantResidentIDP, FORCE_ADD_PW_RECOVERY_QUESTION, "true", true);
@@ -339,7 +344,7 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
             groups = "wso2.is",
             dependsOnMethods = {"testAddSP", "testLoginWithEnabledSetting"})
     public void testLoginWithChallengeQuestions() {
-        try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+        try (CloseableHttpClient httpClient = getClosableHTTPClient()) {
             HttpResponse response;
             // Update resident IDP property for forcing challenge questions
             updateResidentIDPProperty(superTenantResidentIDP, FORCE_ADD_PW_RECOVERY_QUESTION, "true", true);
@@ -389,12 +394,9 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
 
     private HttpResponse sendSAMLMessage(String url, String samlMsgKey, String samlMsgValue, CloseableHttpClient httpClient) throws IOException {
         List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-        HttpPost post = new HttpPost(url);
+        HttpPost post = new HttpPost(getTenantQualifiedURL(url, tenantInfo.getDomain()));
         post.setHeader("User-Agent", USER_AGENT);
         urlParameters.add(new BasicNameValuePair(samlMsgKey, samlMsgValue));
-        if (config.getUserMode() == TestUserMode.TENANT_ADMIN || config.getUserMode() == TestUserMode.TENANT_USER) {
-            urlParameters.add(new BasicNameValuePair(TENANT_DOMAIN_PARAM, config.getUser().getTenantDomain()));
-        }
         post.setEntity(new UrlEncodedFormEntity(urlParameters));
         return httpClient.execute(post);
     }
@@ -591,6 +593,20 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
         updateResidentIDP(residentIdp, isSuperTenant);
     }
 
+    private CloseableHttpClient getClosableHTTPClient() {
+
+        Lookup<CookieSpecProvider> cookieSpecRegistry = RegistryBuilder.<CookieSpecProvider>create()
+                .register(CookieSpecs.DEFAULT, new RFC6265CookieSpecProvider())
+                .build();
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setCookieSpec(CookieSpecs.DEFAULT)
+                .build();
+        return HttpClientBuilder.create()
+                .setDefaultCookieSpecRegistry(cookieSpecRegistry)
+                .setDefaultRequestConfig(requestConfig)
+                .build();
+    }
+
     private enum HttpBinding {
         HTTP_REDIRECT("HTTP-Redirect"),
         HTTP_POST("HTTP-POST");
@@ -607,10 +623,10 @@ public class ChallengeQuestionPostAuthnHandlerTestCase extends ISIntegrationTest
     }
 
     private enum User {
-        SUPER_TENANT_USER("samluser1", "samluser1", "carbon.super", "samluser1", "samluser1@abc.com", "samlnickuser1", true),
-        TENANT_USER("samluser2@wso2.com", "samluser2", "wso2.com", "samluser2", "samluser2@abc.com", "samlnickuser2", true),
-        SUPER_TENANT_USER_WITHOUT_MANDATORY_CLAIMS("samluser3", "samluser3", "carbon.super", "samluser3", "providedClaimValue", "providedClaimValue", false),
-        TENANT_USER_WITHOUT_MANDATORY_CLAIMS("samluser4@wso2.com", "samluser4", "wso2.com", "samluser4", "providedClaimValue", "providedClaimValue", false);
+        SUPER_TENANT_USER("samluser1", "Samluser@1", "carbon.super", "samluser1", "samluser1@abc.com", "samlnickuser1", true),
+        TENANT_USER("samluser2@wso2.com", "Samluser@2", "wso2.com", "samluser2", "samluser2@abc.com", "samlnickuser2", true),
+        SUPER_TENANT_USER_WITHOUT_MANDATORY_CLAIMS("samluser3", "Samluser@3", "carbon.super", "samluser3", "providedClaimValue", "providedClaimValue", false),
+        TENANT_USER_WITHOUT_MANDATORY_CLAIMS("samluser4@wso2.com", "Samluser@4", "wso2.com", "samluser4", "providedClaimValue", "providedClaimValue", false);
 
         private String username;
         private String password;

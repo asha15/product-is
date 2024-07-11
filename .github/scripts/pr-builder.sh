@@ -113,9 +113,9 @@ else
   cd $REPO
   if [ "$REPO" = "carbon-kernel" ]; then
     echo ""
-    echo "Checking out for 4.9.x branch..."
+    echo "Checking out for 4.10.x branch..."
     echo "=========================================================="
-    git checkout 4.9.x
+    git checkout 4.10.x
   elif [ "$REPO" = "carbon-deployment" ]; then
     echo ""
     echo "Checking out for 4.x.x branch in carbon-deployment..."
@@ -126,6 +126,11 @@ else
       echo "Checking out for 5.2.x branch in carbon-analytics-common..."
       echo "=========================================================="
       git checkout 5.2.x
+  elif [ "$REPO" = "identity-extension-utils" ]; then
+      echo ""
+      echo "Checking out for 1.0.x branch in identity-extension-utils..."
+      echo "=========================================================="
+      git checkout 1.0.x
   fi
   DEPENDENCY_VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
   echo "Dependency Version: $DEPENDENCY_VERSION"
@@ -178,6 +183,38 @@ else
     echo ""
     echo "$REPO_TEST_RESULT_2"
   )
+
+  if [ $REPO = "identity-apps" ]; then
+      MAIN_COMPONENT_BUILD_STATUS=$(cat mvn-build.log | grep "\[INFO\] BUILD" | grep -oE '[^ ]+$' | tail -1)
+      SUB_COMPONENT_BUILD_STATUS=$(cat mvn-build.log | grep "\[INFO\] BUILD" | grep -oE '[^ ]+$' | head -1)
+      REPO_BUILD_STATUS="SUCCESS"
+      if [ $MAIN_COMPONENT_BUILD_STATUS != "SUCCESS" ] || [ $SUB_COMPONENT_BUILD_STATUS != "SUCCESS" ]; then
+          REPO_BUILD_STATUS="FAILED"
+      fi
+      REPO_TEST_RESULT_1=$(sed -n -e '/Results :/,/Tests run:/ p' mvn-build.log)
+      REPO_TEST_RESULT_2=$(sed -n -e '/\[INFO\] Results:/,/\[INFO\] Tests run:/ p' mvn-build.log)
+  
+      REPO_FINAL_RESULT=$(
+          echo "==========================================================="
+          if [ $REPO_BUILD_STATUS = "SUCCESS" ]; then
+              echo "BUILD $REPO_BUILD_STATUS"
+          else
+              if [ $MAIN_COMPONENT_BUILD_STATUS != "SUCCESS" ]; then
+              echo "WSO2 Identity Server Apps - Parent Build Failed."
+              fi
+              if [ $SUB_COMPONENT_BUILD_STATUS != "SUCCESS" ]; then
+              echo "WSO2 Identity Server Apps - Login Portal Layouts Build Failed."
+              fi
+          fi
+          echo "=========================================================="
+          echo ""
+          echo "Built version: $DEPENDENCY_VERSION"
+          echo ""
+          echo "$REPO_TEST_RESULT_1"
+          echo ""
+          echo "$REPO_TEST_RESULT_2"
+      )
+  fi
 
   REPO_BUILD_RESULT_LOG_TEMP=$(echo "$REPO_FINAL_RESULT" | sed 's/$/%0A/')
   REPO_BUILD_RESULT_LOG=$(echo $REPO_BUILD_RESULT_LOG_TEMP)
@@ -321,7 +358,7 @@ else
       echo ""
       KERNEL_DEPENDENCY_VERSION=$(echo $DEPENDENCY_VERSION | sed -e "s/-/./g")
       echo "Dependency version for carbon.product : $KERNEL_DEPENDENCY_VERSION"
-      sed -i "s/version=\"4.9.*\"/version=\"$KERNEL_DEPENDENCY_VERSION\"/g" modules/p2-profile-gen/carbon.product
+      sed -i "s/version=\"4.10.*\"/version=\"$KERNEL_DEPENDENCY_VERSION\"/g" modules/p2-profile-gen/carbon.product
     fi
   fi
 

@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2018, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2018, WSO2 LLC. (http://www.wso2.com).
  *
- * WSO2 Inc. licenses this file to you under the Apache License,
+ * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the
+ * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
  */
@@ -30,15 +30,13 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 import org.wso2.carbon.automation.engine.context.TestUserMode;
-import org.wso2.carbon.identity.sso.saml.stub.IdentitySAMLSSOConfigServiceIdentityException;
-import org.wso2.carbon.identity.sso.saml.stub.types.SAMLSSOServiceProviderDTO;
 import org.wso2.carbon.integration.common.admin.client.LogViewerClient;
 import org.wso2.carbon.integration.common.utils.mgt.ServerConfigurationManager;
 import org.wso2.carbon.logging.view.data.xsd.LogEvent;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.SAML2ServiceProvider;
 import org.wso2.identity.integration.test.util.Utils;
 import org.wso2.identity.integration.test.utils.CommonConstants;
 import org.wso2.identity.integration.test.utils.DataExtractUtil;
-import org.wso2.identity.integration.test.utils.UserUtil;
 
 import java.io.File;
 import java.rmi.RemoteException;
@@ -56,18 +54,19 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
     private static final String APPLICATION_ONE = "SAML-TestApplication-01";
     private static final String APPLICATION_TWO = "SAML-TestApplication-02";
     private static final String SAML_APP_ONE_ACS_URL = "http://localhost:8490/travelocity.com/home.jsp";
-    private static final String SAML_APP_TWO_ACS_URL = "http://localhost:8490/travelocity.com-saml-tenantwithoutsigning/home.jsp";
+    private static final String SAML_APP_TWO_ACS_URL = "http://localhost:8490/travelocity.com-saml-supertenantwithoutsigning/home.jsp";
 
-    private SAMLConfig samlConfigOne;
-    private SAMLConfig samlConfigTwo;
+    private final SAMLConfig samlConfigOne;
+    private final SAMLConfig samlConfigTwo;
     private String resultPage;
-    private SAMLSSOServiceProviderDTO samlssoServiceProviderDTO;
     private ServerConfigurationManager serverConfigurationManager;
     private String userId;
 
     private LogViewerClient logViewer;
 
     private static final Long WAIT_TIME = 10000L;
+    private String appOneId;
+    private String appTwoId;
 
     @Factory(dataProvider = "samlConfigProvider")
     public SAMLIdPInitiatedSLOTestCase(SAMLConfig samlConfigOne, SAMLConfig samlConfigTwo) {
@@ -86,7 +85,7 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
                 {new SAMLConfig(TestUserMode.SUPER_TENANT_ADMIN, User.SUPER_TENANT_USER, HttpBinding.HTTP_POST,
                         ClaimType.LOCAL, App.SUPER_TENANT_APP_WITH_SIGNING),
                         new SAMLConfig(TestUserMode.SUPER_TENANT_ADMIN, User.SUPER_TENANT_USER, HttpBinding.HTTP_POST,
-                                ClaimType.LOCAL, App.TENANT_APP_WITHOUT_SIGNING)},
+                                ClaimType.LOCAL, App.SUPER_TENANT_APP_WITHOUT_SIGNING)},
         };
     }
 
@@ -96,11 +95,10 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
         super.init(samlConfigOne.getUserMode());
         super.testInit();
 
-        super.createUser(samlConfigOne);
-        userId = UserUtil.getUserId(samlConfigOne.getUser().getTenantAwareUsername(), isServer.getContextTenant());
+        userId = super.addUser(samlConfigOne);
 
-        super.createApplication(samlConfigOne, APPLICATION_ONE);
-        super.createApplication(samlConfigTwo, APPLICATION_TWO);
+        appOneId = super.addApplication(samlConfigOne, APPLICATION_ONE);
+        appTwoId = super.addApplication(samlConfigTwo, APPLICATION_TWO);
 
         logViewer = new LogViewerClient(backendURL, sessionCookie);
         changeISConfiguration();
@@ -110,9 +108,9 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
     public void testClear() throws Exception {
 
         resetISConfiguration();
-        super.deleteUser(samlConfigOne);
-        super.deleteApplication(APPLICATION_ONE);
-        super.deleteApplication(APPLICATION_TWO);
+        super.deleteUser(userId);
+        super.deleteApp(appOneId);
+        super.deleteApp(appTwoId);
         super.testClear();
     }
 
@@ -139,19 +137,14 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
     @Test(description = "Add service providers", groups = "wso2.is", priority = 1)
     public void testAddSP() throws Exception {
 
-        Boolean isAddSuccess;
+        applicationMgtRestClient.updateInboundDetailsOfApplication(appOneId, getSAMLConfigurations(samlConfigOne), SAML);
+        SAML2ServiceProvider samlConfig = applicationMgtRestClient.getSAMLInboundDetails(appOneId);
+        Assert.assertNotNull(samlConfig, "Adding a service provider has failed for " + samlConfigOne);
 
-        isAddSuccess = ssoConfigServiceClient.addServiceProvider(super.createSsoServiceProviderDTO(samlConfigOne));
-        Assert.assertTrue(isAddSuccess, "Adding a service provider has failed for " + samlConfigOne);
-
-        samlssoServiceProviderDTO = getServiceProvider(samlConfigOne);
-        Assert.assertNotNull(samlssoServiceProviderDTO, "Adding a service provider has failed for " + samlConfigOne);
-
-        isAddSuccess = ssoConfigServiceClient.addServiceProvider(super.createSsoServiceProviderDTO(samlConfigTwo));
-        Assert.assertTrue(isAddSuccess, "Adding a service provider has failed for " + samlConfigTwo);
-
-        samlssoServiceProviderDTO = getServiceProvider(samlConfigTwo);
-        Assert.assertNotNull(samlssoServiceProviderDTO, "Adding a service provider has failed for " + samlConfigTwo);
+        applicationMgtRestClient.updateInboundDetailsOfApplication(appTwoId, getSAMLConfigurations(samlConfigTwo),
+                "saml");
+        samlConfig = applicationMgtRestClient.getSAMLInboundDetails(appTwoId);
+        Assert.assertNotNull(samlConfig, "Adding a service provider has failed for " + samlConfigTwo);
     }
 
     @Test(alwaysRun = true, description = "Testing SAML SSO login", groups = "wso2.is",
@@ -231,7 +224,7 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
             boolean requestTwoSentLogFound = checkForLog(logViewer,
                     "single logout request is sent to : " + SAML_APP_TWO_ACS_URL + " is returned with OK");
             Assert.assertTrue(requestTwoSentLogFound, "System Log not found. Single logout request is not " +
-                    "sent to travelocity.com-saml-tenantwithoutsigning app.");
+                    "sent to travelocity.com-saml-supertenantwithoutsigning app.");
 
             boolean responseOneReceivedLogFound = checkForLog(logViewer,
                     "Logout response received for issuer: travelocity.com for tenant domain: carbon.super");
@@ -239,10 +232,10 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
                     "received for issuer travelocity.com");
 
             boolean responseTwoReceivedLogFound = checkForLog(logViewer,
-                    "Logout response received for issuer: travelocity.com-saml-tenantwithoutsigning for " +
+                    "Logout response received for issuer: travelocity.com-saml-supertenantwithoutsigning for " +
                             "tenant domain: carbon.super");
             Assert.assertTrue(responseTwoReceivedLogFound, "System Log not found. Logout response is not " +
-                    "received for issuer travelocity.com-saml-tenantwithoutsigning");
+                    "received for issuer travelocity.com-saml-supertenantwithoutsigning");
         } catch (Exception e) {
             Assert.fail("SAML IdP initiated SLO test failed for " + samlConfigOne.getApp().getArtifact()
                     + " & " + samlConfigTwo.getApp().getArtifact(), e);
@@ -321,17 +314,5 @@ public class SAMLIdPInitiatedSLOTestCase extends AbstractSAMLSSOTestCase {
             }
         }
         return matchFound;
-    }
-
-    private SAMLSSOServiceProviderDTO getServiceProvider(SAMLConfig samlConfig) throws RemoteException, IdentitySAMLSSOConfigServiceIdentityException {
-
-        SAMLSSOServiceProviderDTO[] samlssoServiceProviderDTOs = ssoConfigServiceClient.getServiceProviders()
-                .getServiceProviders();
-        for (SAMLSSOServiceProviderDTO spDTO : samlssoServiceProviderDTOs) {
-            if (spDTO.getIssuer().equals(samlConfig.getApp().getArtifact())) {
-                return spDTO;
-            }
-        }
-        return null;
     }
 }

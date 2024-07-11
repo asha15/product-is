@@ -54,6 +54,9 @@ public class IdentityGovernanceSuccessTest extends IdentityGovernanceTestBase {
 
     private static final String CATEGORY_ACCOUNT_MANAGEMENT_PROPERTIES = "QWNjb3VudCBNYW5hZ2VtZW50";
     private static final String CONNECTOR_LOCK_IDLE_ACCOUNTS = "c3VzcGVuc2lvbi5ub3RpZmljYXRpb24";
+    private static final String CATEGORY_PASSWORD_POLICIES = "UGFzc3dvcmQgUG9saWNpZXM";
+    private static final String CONNECTOR_PASSWORD_EXPIRY = "cGFzc3dvcmRFeHBpcnk";
+    private static final String CONNECTOR_PASSWORD_HISTORY = "cGFzc3dvcmRIaXN0b3J5";
     private Map<String, CategoriesRes> categories;
     private static List<PreferenceResp> connectors;
     private static List<PreferenceResp> connectorsWithAllProperties;
@@ -139,8 +142,8 @@ public class IdentityGovernanceSuccessTest extends IdentityGovernanceTestBase {
                     equalTo(category.getValue().getName()));
 
             validatableResponse.body("find{ it.id == '" + category.getKey() + "' }.self",
-                    equalTo("/t/" + tenant + "/api/server/v1" + IDENTITY_GOVERNANCE_ENDPOINT_URI + "/" +
-                            category.getValue().getId()));
+                    equalTo(getTenantedRelativePath("/api/server/v1" +
+                            IDENTITY_GOVERNANCE_ENDPOINT_URI + "/" + category.getValue().getId(), tenant)));
         }
     }
 
@@ -252,6 +255,41 @@ public class IdentityGovernanceSuccessTest extends IdentityGovernanceTestBase {
                 .body("properties.find{it.name == '" +
                                 "suspension.notification.account.disable.delay" + "' }.value",
                         equalTo("91"));
+    }
+
+    @Test(description = "Update governance connectors with correct data.")
+    public void testUpdateGovernanceConnectors() throws IOException {
+
+        String body = readResource("update-multiple-connector-properties.json");
+        Response response =
+                getResponseOfPatch(IDENTITY_GOVERNANCE_ENDPOINT_URI +
+                                "/" + CATEGORY_PASSWORD_POLICIES + "/connectors/", body);
+        response.then()
+                .log().ifValidationFails()
+                .assertThat()
+                .statusCode(HttpStatus.SC_OK);
+
+        Response getResponsePasswordExpiry =
+                getResponseOfGet(IDENTITY_GOVERNANCE_ENDPOINT_URI +
+                        "/" + CATEGORY_PASSWORD_POLICIES + "/connectors/" + CONNECTOR_PASSWORD_EXPIRY);
+
+        getResponsePasswordExpiry.then()
+                .log().ifValidationFails()
+                .assertThat()
+                .statusCode(HttpStatus.SC_OK)
+                .body("properties.find{it.name == 'passwordExpiry.enablePasswordExpiry' }.value",
+                        equalTo("true"));
+
+        Response getResponsePasswordHistory =
+                getResponseOfGet(IDENTITY_GOVERNANCE_ENDPOINT_URI +
+                        "/" + CATEGORY_PASSWORD_POLICIES + "/connectors/" + CONNECTOR_PASSWORD_HISTORY);
+
+        getResponsePasswordHistory.then()
+                .log().ifValidationFails()
+                .assertThat()
+                .statusCode(HttpStatus.SC_OK)
+                .body("properties.find{it.name == 'passwordHistory.enable' }.value",
+                        equalTo("true"));
     }
 
     @Test

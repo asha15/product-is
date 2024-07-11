@@ -46,7 +46,7 @@ public class SelfRegisterTestCase extends SelfRegisterTestBase {
         this.tenant = context.getContextTenant().getDomain();
 
         super.testInit(API_VERSION_SELF_REGISTER, swaggerDefinitionSelfRegister, tenant,
-                API_SELF_REGISTER_BASE_PATH_IN_SWAGGER, API_SELF_REGISTER_BASE_PATH_WITH_TENANT_CONTEXT);
+                API_SELF_REGISTER_BASE_PATH_IN_SWAGGER, API_SELF_REGISTER_BASE_PATH);
         selfRegisterUserInfo = readResource("self-register-request-body.json");
     }
 
@@ -67,6 +67,17 @@ public class SelfRegisterTestCase extends SelfRegisterTestBase {
         updateResidentIDPProperty(ENABLE_SELF_SIGN_UP, "false", true);
         Response responseOfPost = getResponseOfPost(SELF_REGISTRATION_ENDPOINT, selfRegisterUserInfo);
         Assert.assertEquals(responseOfPost.statusCode(), HttpStatus.SC_BAD_REQUEST, "Self register user not enabled");
+    }
+
+    @Test(alwaysRun = true, groups = "wso2.is", description = "Create self registered user with invalid password")
+    public void testSelfRegisterWithInvalidPassword() throws Exception {
+
+        updateResidentIDPProperty(ENABLE_SELF_SIGN_UP, "true", true);
+        String selfRegisterUserInfoWithInvalidPassword = selfRegisterUserInfo.replaceAll("Password12!", "123");
+        Response responseOfPost =
+                getResponseOfPost(SELF_REGISTRATION_ENDPOINT, selfRegisterUserInfoWithInvalidPassword);
+        Assert.assertEquals(responseOfPost.statusCode(), HttpStatus.SC_BAD_REQUEST,
+                "Self register user password invalid");
     }
 
     @Test(alwaysRun = true, groups = "wso2.is", description = "Create self registered user")
@@ -98,16 +109,5 @@ public class SelfRegisterTestCase extends SelfRegisterTestBase {
         Response responseOfPost =
                 getResponseOfPost(SELF_REGISTRATION_ENDPOINT, selfRegisterUserInfoWithInvalidUsername);
         Assert.assertEquals(responseOfPost.statusCode(), HttpStatus.SC_BAD_REQUEST, "Self register username invalid");
-    }
-
-    @Test(alwaysRun = true, groups = "wso2.is", description = "Create self registered user with invalid password")
-    public void testSelfRegisterWithInvalidPassword() throws Exception {
-
-        updateResidentIDPProperty(ENABLE_SELF_SIGN_UP, "true", true);
-        String selfRegisterUserInfoWithInvalidPassword = selfRegisterUserInfo.replaceAll("Password12!", "123");
-        Response responseOfPost =
-                getResponseOfPost(SELF_REGISTRATION_ENDPOINT, selfRegisterUserInfoWithInvalidPassword);
-        Assert.assertEquals(responseOfPost.statusCode(), HttpStatus.SC_BAD_REQUEST,
-                "Self register user password invalid");
     }
 }

@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.wso2.is</groupId>
         <artifactId>4.1-sso-for-web-app</artifactId>
-        <version>5.8.0</version>
+        <version>7.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -177,7 +177,8 @@
         <dependency>
             <groupId>net.minidev</groupId>
             <artifactId>json-smart</artifactId>
-            <version>2.4.7</version>
+            <version>2.4.10</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

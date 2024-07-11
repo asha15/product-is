@@ -23,10 +23,16 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.config.Lookup;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.cookie.CookieSpecProvider;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.cookie.RFC6265CookieSpecProvider;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.testng.Assert;
@@ -100,8 +106,9 @@ public class EmailOTPTestCase extends ISIntegrationTest {
             CommonConstants.IS_DEFAULT_HTTPS_PORT + "/authenticationendpoint/email_otp.do";
     private static final String USER_AGENT = "Apache-HttpClient/4.2.5 (java 1.5)";
     private static final String profileName = "default";
-    private static final String TENANT_DOMAIN_PARAM = "tenantDomain";
 
+    private Lookup<CookieSpecProvider> cookieSpecRegistry;
+    private RequestConfig requestConfig;
     private HttpClient httpClient;
     private ApplicationManagementServiceClient applicationManagementServiceClient;
     private SAMLSSOConfigServiceClient ssoConfigServiceClient;
@@ -134,8 +141,17 @@ public class EmailOTPTestCase extends ISIntegrationTest {
         identityProviderMgtServiceClient = new IdentityProviderMgtServiceClient(sessionCookie, backendURL,
                 configContext);
         remoteUSMServiceClient = new RemoteUserStoreManagerServiceClient(backendURL, sessionCookie);
-        httpClient = HttpClientBuilder.create().setDefaultCookieStore(new BasicCookieStore()).build();
 
+        cookieSpecRegistry = RegistryBuilder.<CookieSpecProvider>create()
+                .register(CookieSpecs.DEFAULT, new RFC6265CookieSpecProvider())
+                .build();
+        requestConfig = RequestConfig.custom()
+                .setCookieSpec(CookieSpecs.DEFAULT)
+                .build();
+        httpClient = HttpClientBuilder.create().setDefaultCookieStore(new BasicCookieStore())
+                .setDefaultRequestConfig(requestConfig)
+                .setDefaultCookieSpecRegistry(cookieSpecRegistry)
+                .build();
         createUser();
         createApplication();
     }
@@ -208,10 +224,9 @@ public class EmailOTPTestCase extends ISIntegrationTest {
     private HttpResponse sendSAMLMessage(String url, String samlMsgValue) throws IOException {
 
         List<NameValuePair> urlParameters = new ArrayList<>();
-        HttpPost post = new HttpPost(url);
+        HttpPost post = new HttpPost(getTenantQualifiedURL(url, tenantInfo.getDomain()));
         post.setHeader("User-Agent", USER_AGENT);
         urlParameters.add(new BasicNameValuePair(CommonConstants.SAML_REQUEST_PARAM, samlMsgValue));
-        urlParameters.add(new BasicNameValuePair(TENANT_DOMAIN_PARAM, config.getTenantDomain()));
         post.setEntity(new UrlEncodedFormEntity(urlParameters));
         return httpClient.execute(post);
     }
@@ -382,9 +397,9 @@ public class EmailOTPTestCase extends ISIntegrationTest {
     public static TestConfig[][] testConfigProvider(){
 
         return new TestConfig[][] {
-                {new TestConfig(TestUserMode.SUPER_TENANT_ADMIN, "testuser1", "testuser1",
+                {new TestConfig(TestUserMode.SUPER_TENANT_ADMIN, "testuser1", "Wso2@test1",
                 "carbon.super", "testuser1", "testuser1@abc.com", "travelocity.com")},
-                {new TestConfig(TestUserMode.TENANT_ADMIN, "testuser2@wso2.com", "testuser2",
+                {new TestConfig(TestUserMode.TENANT_ADMIN, "testuser2@wso2.com", "Wso2@test2",
                         "wso2.com", "testuser2", "testuser2@abc.com", "travelocity.com-saml-tenantwithoutsigning")}
         };
     }

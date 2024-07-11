@@ -18,6 +18,7 @@ package org.wso2.identity.integration.test.rest.api.server.application.managemen
 import io.restassured.response.Response;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
+import org.hamcrest.Matchers;
 import org.json.JSONObject;
 import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
@@ -25,6 +26,7 @@ import org.wso2.carbon.automation.engine.context.TestUserMode;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.core.IsNull.notNullValue;
+import static org.hamcrest.core.IsNull.nullValue;
 import static org.wso2.identity.integration.test.rest.api.server.application.management.v1.Utils.assertNotBlank;
 import static org.wso2.identity.integration.test.rest.api.server.application.management.v1.Utils.extractApplicationIdFromLocationHeader;
 
@@ -35,6 +37,7 @@ public class ApplicationPatchTest extends ApplicationManagementBaseTest {
 
     private static final String APP_NAME = "testPatchApplication";
     public static final String UPDATED_APP_NAME = "testUpdateNameApplication";
+    public static final String SUBJECT_CLAIM_URI = "http://wso2.org/claims/username";
     private String appId;
 
     @Factory(dataProvider = "restAPIUserConfigProvider")
@@ -117,7 +120,8 @@ public class ApplicationPatchTest extends ApplicationManagementBaseTest {
                 .body("advancedConfigurations.find{ it.key == 'skipLoginConsent' }.value", equalTo(false))
                 .body("advancedConfigurations.find{ it.key == 'skipLogoutConsent' }.value", equalTo(false))
                 .body("advancedConfigurations.find{ it.key == 'returnAuthenticatedIdpList' }.value", equalTo(false))
-                .body("advancedConfigurations.find{ it.key == 'enableAuthorization' }.value", equalTo(false));
+                .body("advancedConfigurations.find{ it.key == 'enableAuthorization' }.value", equalTo(false))
+                .body("advancedConfigurations.trustedAppConfiguration", nullValue());
 
         // Do the PATCH update request.
         String patchRequest = readResource("patch-application-advanced-configuration.json");
@@ -133,10 +137,52 @@ public class ApplicationPatchTest extends ApplicationManagementBaseTest {
                 .body("advancedConfigurations.find{ it.key == 'skipLoginConsent' }.value", equalTo(true))
                 .body("advancedConfigurations.find{ it.key == 'skipLogoutConsent' }.value", equalTo(true))
                 .body("advancedConfigurations.find{ it.key == 'returnAuthenticatedIdpList' }.value", equalTo(true))
-                .body("advancedConfigurations.find{ it.key == 'enableAuthorization' }.value", equalTo(true));
+                .body("advancedConfigurations.find{ it.key == 'enableAuthorization' }.value", equalTo(true))
+                .body("advancedConfigurations.trustedAppConfiguration.find{ it.key == 'isFIDOTrustedApp' }.value",
+                        equalTo(true))
+                .body("advancedConfigurations.trustedAppConfiguration.find{ it.key == 'isConsentGranted' }.value",
+                        equalTo(true))
+                .body("advancedConfigurations.trustedAppConfiguration.find{ it.key == 'androidPackageName' }.value",
+                        equalTo("sample.package.name"))
+                .body("advancedConfigurations.trustedAppConfiguration.find{ it.key == 'androidThumbprints' }.value",
+                        Matchers.hasItem("sampleThumbprint"))
+                .body("advancedConfigurations.trustedAppConfiguration.find{ it.key == 'appleAppId' }.value",
+                        equalTo("sample.app.id"));
     }
 
-    @Test(dependsOnMethods = "testUpdateAdvancedConfiguration")
+    @Test(description = "Test updating the claim configuration of an application",
+            dependsOnMethods = "testUpdateAdvancedConfiguration")
+    public void testUpdateClaimConfiguration() throws Exception {
+
+        String requestBody = readResource("update-claim-configuration.json");
+        getResponseOfPatch(APPLICATION_MANAGEMENT_API_BASE_PATH + "/" + appId, requestBody)
+                .then()
+                .log().ifValidationFails()
+                .assertThat()
+                .statusCode(HttpStatus.SC_OK);
+
+        getApplication(appId).then()
+                .body("claimConfiguration.subject.claim.uri", equalTo(SUBJECT_CLAIM_URI))
+                .body("claimConfiguration.subject.useMappedLocalSubject", equalTo(true))
+                .body("claimConfiguration.subject.mappedLocalSubjectMandatory", equalTo(true))
+                .body("claimConfiguration.subject.includeUserDomain", equalTo(false))
+                .body("claimConfiguration.subject.includeTenantDomain", equalTo(false));
+    }
+
+    @Test(description = "Test updating claim configuration by disabling useMappedLocalSubject and enabling " +
+            "mappedLocalSubjectMandatory",
+            dependsOnMethods = "testUpdateClaimConfiguration")
+    public void testUpdateInvalidClaimConfiguration() throws Exception {
+
+        String requestBody = readResource("invalid-claim-configuration.json");
+        getResponseOfPatch(APPLICATION_MANAGEMENT_API_BASE_PATH + "/" + appId, requestBody)
+                .then()
+                .log().ifValidationFails()
+                .assertThat()
+                .statusCode(HttpStatus.SC_BAD_REQUEST);
+    }
+
+    @Test(dependsOnMethods = "testUpdateInvalidClaimConfiguration", alwaysRun = true)
     public void testDeleteApplicationById() throws Exception {
 
         getResponseOfDelete(APPLICATION_MANAGEMENT_API_BASE_PATH + "/" + appId)

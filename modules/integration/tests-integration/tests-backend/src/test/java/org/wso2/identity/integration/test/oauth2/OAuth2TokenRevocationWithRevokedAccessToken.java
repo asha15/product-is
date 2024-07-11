@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2019, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2019, WSO2 LLC. (http://www.wso2.com).
  *
- * WSO2 Inc. licenses this file to you under the Apache License,
+ * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,7 +11,7 @@
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the
+ * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
  */
@@ -33,7 +33,6 @@ import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.token.AccessToken;
 import com.nimbusds.oauth2.sdk.token.BearerAccessToken;
-import org.apache.http.impl.client.HttpClientBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -42,15 +41,31 @@ import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 import org.wso2.carbon.automation.engine.context.AutomationContext;
 import org.wso2.carbon.automation.engine.context.TestUserMode;
-import org.wso2.carbon.identity.oauth.stub.dto.OAuthConsumerAppDTO;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.AccessTokenConfiguration;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationPatchModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationResponseModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.AssociatedRolesConfig;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.InboundProtocols;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.OpenIDConnectConfiguration;
+import org.wso2.identity.integration.test.utils.CarbonUtils;
 import org.wso2.identity.integration.test.utils.OAuth2Constant;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * This test class is used to check the behaviour of OAuth token revocation flow.
  */
 public class OAuth2TokenRevocationWithRevokedAccessToken extends OAuth2ServiceAbstractIntegrationTest {
+
+    private static final String TENANT_DOMAIN = "wso2.com";
+    private static final String INTROSPECT_SCOPE = "internal_application_mgt_view";
+    private static final String INTROSPECT_SCOPE_IN_NEW_AUTHZ_RUNTIME = "internal_oauth2_introspect";
+    private static boolean isLegacyRuntimeEnabled;
 
     private ClientID consumerKey;
     private Secret consumerSecret;
@@ -59,14 +74,14 @@ public class OAuth2TokenRevocationWithRevokedAccessToken extends OAuth2ServiceAb
     private final String username;
     private final String userPassword;
     private final String activeTenant;
-    private static final String TENANT_DOMAIN = "wso2.com";
+    private String applicationId;
 
     @Factory(dataProvider = "oAuthConsumerApplicationProvider")
     public OAuth2TokenRevocationWithRevokedAccessToken(String tokenType, TestUserMode userMode) throws Exception {
 
         super.init(userMode);
         AutomationContext context = new AutomationContext("IDENTITY", userMode);
-        this.username = context.getContextTenant().getTenantAdmin().getUserName();
+        this.username = context.getContextTenant().getTenantAdmin().getUserNameWithoutDomain();
         this.userPassword = context.getContextTenant().getTenantAdmin().getPassword();
         this.activeTenant = context.getContextTenant().getDomain();
         this.tokenType = tokenType;
@@ -87,18 +102,24 @@ public class OAuth2TokenRevocationWithRevokedAccessToken extends OAuth2ServiceAb
     @BeforeClass(alwaysRun = true)
     public void testInit() throws Exception {
 
-        OAuthConsumerAppDTO appDTO = new OAuthConsumerAppDTO();
-        appDTO.setApplicationName(OAuth2Constant.OAUTH_APPLICATION_NAME);
-        appDTO.setCallbackUrl(OAuth2Constant.CALLBACK_URL);
-        appDTO.setOAuthVersion(OAuth2Constant.OAUTH_VERSION_2);
-        appDTO.setTokenType(tokenType);
-        appDTO.setGrantTypes("authorization_code implicit password client_credentials refresh_token "
-                + "urn:ietf:params:oauth:grant-type:saml2-bearer iwa:ntlm");
+        isLegacyRuntimeEnabled = CarbonUtils.isLegacyAuthzRuntimeEnabled();
+        ApplicationResponseModel application = createApp();
+        applicationId = application.getId();
 
-        OAuthConsumerAppDTO oAuthConsumerAppDTO = createApplication(appDTO, SERVICE_PROVIDER_NAME);
+        OpenIDConnectConfiguration oidcConfig = getOIDCInboundDetailsOfApplication(applicationId);
 
-        consumerKey = new ClientID(oAuthConsumerAppDTO.getOauthConsumerKey());
-        consumerSecret = new Secret(oAuthConsumerAppDTO.getOauthConsumerSecret());
+        consumerKey = new ClientID(oidcConfig.getClientId());
+        consumerSecret = new Secret(oidcConfig.getClientSecret());
+        if (!isLegacyRuntimeEnabled) {
+            // Authorize /oauth2/introspect API.
+            authorizeSystemAPIs(applicationId, new ArrayList<>(Arrays.asList("/oauth2/introspect")));
+            // Associate roles.
+            ApplicationPatchModel applicationPatch = new ApplicationPatchModel();
+            AssociatedRolesConfig associatedRolesConfig =
+                    new AssociatedRolesConfig().allowedAudience(AssociatedRolesConfig.AllowedAudienceEnum.ORGANIZATION);
+            applicationPatch = applicationPatch.associatedRoles(associatedRolesConfig);
+            updateApplication(applicationId, applicationPatch);
+        }
     }
 
     @Test(description = "Call revocation request with a revoked access token")
@@ -171,7 +192,7 @@ public class OAuth2TokenRevocationWithRevokedAccessToken extends OAuth2ServiceAb
     private AccessToken requestAccessToken() throws Exception {
 
         ClientAuthentication clientAuth = new ClientSecretBasic(consumerKey, consumerSecret);
-        URI tokenEndpoint = new URI(OAuth2Constant.ACCESS_TOKEN_ENDPOINT);
+        URI tokenEndpoint = new URI(getTenantQualifiedURL(OAuth2Constant.ACCESS_TOKEN_ENDPOINT, activeTenant));
         AuthorizationGrant authorizationGrant = new ResourceOwnerPasswordCredentialsGrant(username,
                 new Secret(userPassword));
 
@@ -185,12 +206,15 @@ public class OAuth2TokenRevocationWithRevokedAccessToken extends OAuth2ServiceAb
     private AccessToken requestPrivilegedAccessToken() throws Exception {
 
         ClientAuthentication clientAuth = new ClientSecretBasic(consumerKey, consumerSecret);
-        URI tokenEndpoint = new URI(OAuth2Constant.ACCESS_TOKEN_ENDPOINT);
+        URI tokenEndpoint = new URI(getTenantQualifiedURL(OAuth2Constant.ACCESS_TOKEN_ENDPOINT, activeTenant));
         AuthorizationGrant authorizationGrant = new ResourceOwnerPasswordCredentialsGrant(username,
                 new Secret(userPassword));
-
-        Scope scope = new Scope("internal_application_mgt_view");
-
+        Scope scope;
+        if (isLegacyRuntimeEnabled) {
+            scope = new Scope(INTROSPECT_SCOPE);
+        } else {
+            scope = new Scope(INTROSPECT_SCOPE_IN_NEW_AUTHZ_RUNTIME);
+        }
         TokenRequest request = new TokenRequest(tokenEndpoint, clientAuth, authorizationGrant, scope);
         HTTPResponse tokenHTTPResp = request.toHTTPRequest().send();
 
@@ -237,9 +261,42 @@ public class OAuth2TokenRevocationWithRevokedAccessToken extends OAuth2ServiceAb
         return TokenIntrospectionResponse.parse(introspectionHTTPResp);
     }
 
+    private ApplicationResponseModel createApp() throws Exception {
+
+        ApplicationModel application = new ApplicationModel();
+
+        List<String> grantTypes = new ArrayList<>();
+        Collections.addAll(grantTypes, "authorization_code", "implicit", "password", "client_credentials",
+                "refresh_token", "urn:ietf:params:oauth:grant-type:saml2-bearer", "iwa:ntlm");
+
+        List<String> callBackUrls = new ArrayList<>();
+        Collections.addAll(callBackUrls, OAuth2Constant.CALLBACK_URL);
+
+        OpenIDConnectConfiguration oidcConfig = new OpenIDConnectConfiguration();
+        oidcConfig.setGrantTypes(grantTypes);
+        oidcConfig.setCallbackURLs(callBackUrls);
+
+        AccessTokenConfiguration accessTokenConfig = new AccessTokenConfiguration().type(tokenType);
+        accessTokenConfig.setUserAccessTokenExpiryInSeconds(3600L);
+        accessTokenConfig.setApplicationAccessTokenExpiryInSeconds(3600L);
+
+        oidcConfig.setAccessToken(accessTokenConfig);
+
+        InboundProtocols inboundProtocolsConfig = new InboundProtocols();
+        inboundProtocolsConfig.setOidc(oidcConfig);
+
+        application.setInboundProtocolConfiguration(inboundProtocolsConfig);
+        application.setName(OAuth2Constant.OAUTH_APPLICATION_NAME);
+
+        String appId = addApplication(application);
+
+        return getApplication(appId);
+    }
+
     @AfterClass(alwaysRun = true)
     public void atEnd() throws Exception {
 
-        deleteApplication();
+        deleteApp(applicationId);
+        restClient.closeHttpClient();
     }
 }

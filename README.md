@@ -4,14 +4,11 @@
      alt="WSO2 Identity Server" />
 </a>
 
-Welcome to WSO2 Identity Server
-===============================
-
----
+# Welcome to WSO2 Identity Server
 
 |  Branch | Build Status | Test Results |
 | :------------ |:------------- |:-------------
-| master      | [![Build Status](https://img.shields.io/jenkins/build?jobUrl=https%3A%2F%2Fwso2.org%2Fjenkins%2Fjob%2Fproducts%2Fjob%2Fproduct-is%2F&style=flat)](https://wso2.org/jenkins/job/products/job/product-is/) | [![Test Results](https://img.shields.io/jenkins/tests?compact_message&failed_label=failed&jobUrl=https%3A%2F%2Fwso2.org%2Fjenkins%2Fjob%2Fproducts%2Fjob%2Fproduct-is%2F&passed_label=passed&skipped_label=skipped)](https://wso2.org/jenkins/job/products/job/product-is/lastBuild/testReport/) |
+| master      | [![Build Status](https://wso2.org/jenkins/job/products/job/product-is/badge/icon)](https://wso2.org/jenkins/job/products/job/product-is/) | [![Test Results](https://wso2.org/jenkins/job/products/job/product-is/badge/icon)](https://wso2.org/jenkins/job/products/job/product-is/lastBuild/testReport/) |
 
 
 [![Stackoverflow](https://img.shields.io/badge/Ask%20for%20help%20on-Stackoverflow-orange)](https://stackoverflow.com/questions/tagged/wso2is)
@@ -42,7 +39,7 @@ System Requirements
 5. To build WSO2 Identity Server from the Source distribution, it is also necessary that you have Maven 3 or later.
 
 For more details see
-   * https://is.docs.wso2.com/en/6.1.0/deploy/get-started/install/ (For IS 6.1.0 version)
+   * https://is.docs.wso2.com/en/7.0.0/deploy/get-started/install/ (For IS 7.0.0 version)
 
 Project Resources
 =================
@@ -50,7 +47,7 @@ Project Resources
 * Home page          : http://wso2.com/products/identity-server
 * Library            : https://wso2.com/library/identity-and-access-management
 * Wiki 
-    * IS 6.1.0 version     : https://is.docs.wso2.com/en/6.1.0/
+    * IS 7.0.0 version     : https://is.docs.wso2.com/en/7.0.0/
 * Issue Tracker      : https://github.com/wso2/product-is/issues      
 * Forums             : http://stackoverflow.com/questions/tagged/wso2is/
 * IAM Developer List: iam-dev@wso2.org
@@ -199,7 +196,7 @@ By default mode, it would ask you to enter the master password
 > ciphertool -Dchange  (in UNIX)
 
 For more details see
-https://is.docs.wso2.com/en/6.1.0/deploy/security/encrypt-passwords-with-cipher-tool/
+https://is.docs.wso2.com/en/7.0.0/deploy/security/encrypt-passwords-with-cipher-tool/
 
 Support
 =======
@@ -217,6 +214,16 @@ WSO2 Oxygen Tank developer portal for addition resources.
 
 For further details, see the WSO2 Carbon documentation at
 https://docs.wso2.com/display/Carbon4411/WSO2+Carbon+Documentation
+
+Survey On Open Source Community Communication
+=============================================
+
+WSO2 wants to learn more about our open source software (OSS) community and your communication preferences to serve you better.
+
+In addition, we may reach out to a small number of respondents to ask additional questions and offer a small gift.
+
+Link to survey: https://forms.gle/h5q4M3K7vyXba3bK6
+
 
 ---------------------------------------------------------------------------
 (c) Copyright 2022 WSO2 LLC.

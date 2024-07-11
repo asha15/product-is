@@ -28,33 +28,45 @@ import com.nimbusds.oauth2.sdk.TokenRequest;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication;
 import com.nimbusds.oauth2.sdk.auth.ClientSecretBasic;
 import com.nimbusds.oauth2.sdk.auth.Secret;
+import com.nimbusds.oauth2.sdk.http.HTTPRequest;
 import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.token.AccessToken;
-import com.nimbusds.oauth2.sdk.token.BearerAccessToken;
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.commons.codec.binary.Base64;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.wso2.carbon.automation.engine.context.AutomationContext;
 import org.wso2.carbon.automation.engine.context.TestUserMode;
-import org.wso2.carbon.identity.oauth.stub.dto.OAuthConsumerAppDTO;
 import org.wso2.carbon.integration.common.utils.mgt.ServerConfigurationManager;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.AccessTokenConfiguration;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.InboundProtocols;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.OpenIDConnectConfiguration;
+import org.wso2.identity.integration.test.restclients.OAuth2RestClient;
 import org.wso2.identity.integration.test.util.Utils;
+import org.wso2.identity.integration.test.utils.CarbonUtils;
 import org.wso2.identity.integration.test.utils.OAuth2Constant;
 
 public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractIntegrationTest {
 
     public static final String ADD_SCOPE_DEPLOYMENT_CONFIG = "add_scope_deployment.toml";
     private static final String TENANT_DOMAIN = "wso2.com";
-    private final String tokenType = "Default";
-    private AccessToken privilegedAccessToken;
+    private static final String tokenType = "Default";
     private ClientID consumerKey;
     private Secret consumerSecret;
     private String activeTenant;
     private ServerConfigurationManager serverConfigurationManager;
+    private String applicationId;
+    private String adminUsername;
+    private String adminPassword;
 
     @BeforeClass(alwaysRun = true)
     public void testInit() throws Exception {
@@ -71,27 +83,18 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         super.init();
         AutomationContext context = new AutomationContext("IDENTITY", TestUserMode.SUPER_TENANT_ADMIN);
         this.activeTenant = context.getContextTenant().getDomain();
+        this.adminUsername = context.getContextTenant().getContextUser().getUserName();
+        this.adminPassword = context.getContextTenant().getContextUser().getPassword();
 
-        OAuthConsumerAppDTO appDTO = new OAuthConsumerAppDTO();
-        appDTO.setApplicationName(OAuth2Constant.OAUTH_APPLICATION_NAME);
-        appDTO.setCallbackUrl(OAuth2Constant.CALLBACK_URL);
-        appDTO.setOAuthVersion(OAuth2Constant.OAUTH_VERSION_2);
-        appDTO.setTokenType(tokenType);
-        appDTO.setGrantTypes("client_credentials");
-
-        OAuthConsumerAppDTO oAuthConsumerAppDTO = createApplication(appDTO, SERVICE_PROVIDER_NAME);
-
-        consumerKey = new ClientID(oAuthConsumerAppDTO.getOauthConsumerKey());
-        consumerSecret = new Secret(oAuthConsumerAppDTO.getOauthConsumerSecret());
-
-        privilegedAccessToken = requestAccessToken("internal_application_mgt_view");
+        createOAuthApplication();
     }
 
     @AfterClass(alwaysRun = true)
     public void atEnd() throws Exception {
 
-        deleteApplication();
+        deleteApp(applicationId);
         serverConfigurationManager.restoreToLastConfiguration(false);
+        restClient.closeHttpClient();
     }
 
     @Test(
@@ -105,8 +108,7 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         String scope = "internal_test";
         AccessToken accessToken = requestAccessToken(scope);
 
-        TokenIntrospectionResponse activeTokenIntrospectionResponse =
-                introspectAccessToken(accessToken, privilegedAccessToken);
+        TokenIntrospectionResponse activeTokenIntrospectionResponse = introspectAccessToken(accessToken);
         Assert.assertEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()), scope);
     }
 
@@ -121,15 +123,14 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         String scope = "test";
         AccessToken accessToken = requestAccessToken(scope);
 
-        TokenIntrospectionResponse activeTokenIntrospectionResponse =
-                introspectAccessToken(accessToken, privilegedAccessToken);
+        TokenIntrospectionResponse activeTokenIntrospectionResponse = introspectAccessToken(accessToken);
         Assert.assertEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()), scope);
     }
 
     @Test(
             alwaysRun = true,
             groups = "wso2.is",
-            description = "Generate access token and check if the self service requested scope is returned in " +
+            description = "Generate access token and check if the self service requested scope is not included in " +
                     "introspect response when single internal scope is added"
     )
     public void testScopeNotReturnedInternalLogin() throws Exception {
@@ -137,8 +138,7 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         String scope = "internal_login";
         AccessToken accessToken = requestAccessToken(scope);
 
-        TokenIntrospectionResponse activeTokenIntrospectionResponse =
-                introspectAccessToken(accessToken, privilegedAccessToken);
+        TokenIntrospectionResponse activeTokenIntrospectionResponse = introspectAccessToken(accessToken);
         Assert.assertNotEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()), scope,
                 "Scope shouldn't contain internal login scope");
     }
@@ -154,8 +154,7 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         String scope = "random";
         AccessToken accessToken = requestAccessToken(scope);
 
-        TokenIntrospectionResponse activeTokenIntrospectionResponse =
-                introspectAccessToken(accessToken, privilegedAccessToken);
+        TokenIntrospectionResponse activeTokenIntrospectionResponse = introspectAccessToken(accessToken);
         Assert.assertEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()), scope);
     }
 
@@ -170,25 +169,30 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         String scope = "internal_test test";
         AccessToken accessToken = requestAccessToken(scope);
 
-        TokenIntrospectionResponse activeTokenIntrospectionResponse =
-                introspectAccessToken(accessToken, privilegedAccessToken);
+        TokenIntrospectionResponse activeTokenIntrospectionResponse = introspectAccessToken(accessToken);
         Assert.assertEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()), scope);
     }
 
     @Test(
             alwaysRun = true,
             groups = "wso2.is",
-            description = "Generate access token and check if the added scope is returned in introspect response " +
-                    "when with invalid internal scope"
+            description = "Generate access token and check the behaviour in introspect response when invalid " +
+                    "internal scope is requested"
     )
     public void testScopeReturnedWithInvalidInternalScopeAdded() throws Exception {
 
-        String scope = "internal_claim_meta_create";
+        String scope = "internal_invalid";
         AccessToken accessToken = requestAccessToken(scope);
 
-        TokenIntrospectionResponse activeTokenIntrospectionResponse =
-                introspectAccessToken(accessToken, privilegedAccessToken);
-        Assert.assertEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()), scope);
+        TokenIntrospectionResponse activeTokenIntrospectionResponse = introspectAccessToken(accessToken);
+
+        if (CarbonUtils.isLegacyAuthzRuntimeEnabled()) {
+            Assert.assertNotEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()),
+                    scope, "Scope shouldn't contain internal invalid scopes");
+        } else {
+            Assert.assertEquals(String.valueOf(activeTokenIntrospectionResponse.toSuccessResponse().getScope()),
+                    scope, "Scope should contain internal invalid scopes");
+        }
     }
 
     private AccessToken requestAccessToken(String requestedScope) throws Exception {
@@ -206,8 +210,7 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         return accessTokenResponse.getTokens().getAccessToken();
     }
 
-    private TokenIntrospectionResponse introspectAccessToken(AccessToken accessToken, AccessToken privilegedAccessToken)
-            throws Exception {
+    private TokenIntrospectionResponse introspectAccessToken(AccessToken accessToken) throws Exception {
 
         URI introSpecEndpoint;
         if (TENANT_DOMAIN.equals(activeTenant)) {
@@ -215,11 +218,50 @@ public class OAuth2TokenScopeValidatorTestCase extends OAuth2ServiceAbstractInte
         } else {
             introSpecEndpoint = new URI(OAuth2Constant.INTRO_SPEC_ENDPOINT);
         }
-        BearerAccessToken bearerAccessToken = new BearerAccessToken(privilegedAccessToken.getValue());
-        TokenIntrospectionRequest TokenIntroRequest =
-                new TokenIntrospectionRequest(introSpecEndpoint, bearerAccessToken, accessToken);
-        HTTPResponse introspectionHTTPResp = TokenIntroRequest.toHTTPRequest().send();
+        HTTPRequest TokenIntroRequest = new TokenIntrospectionRequest(introSpecEndpoint, accessToken).toHTTPRequest();
+        TokenIntroRequest.setAuthorization(getAuthzHeader());
+        HTTPResponse introspectionHTTPResp = TokenIntroRequest.send();
 
         return TokenIntrospectionResponse.parse(introspectionHTTPResp);
+    }
+
+    private void createOAuthApplication() throws Exception {
+
+        restClient = new OAuth2RestClient(serverURL, tenantInfo);
+        ApplicationModel application = new ApplicationModel();
+
+        List<String> grantTypes = new ArrayList<>();
+        Collections.addAll(grantTypes, "client_credentials");
+
+        List<String> callBackUrls = new ArrayList<>();
+        Collections.addAll(callBackUrls, OAuth2Constant.CALLBACK_URL);
+
+        AccessTokenConfiguration accessTokenConfig = new AccessTokenConfiguration().type(tokenType);
+        accessTokenConfig.setUserAccessTokenExpiryInSeconds(3600L);
+        accessTokenConfig.setApplicationAccessTokenExpiryInSeconds(3600L);
+
+        OpenIDConnectConfiguration oidcConfig = new OpenIDConnectConfiguration();
+        oidcConfig.setGrantTypes(grantTypes);
+        oidcConfig.setCallbackURLs(callBackUrls);
+        oidcConfig.setAccessToken(accessTokenConfig);
+
+        InboundProtocols inboundProtocolsConfig = new InboundProtocols();
+        inboundProtocolsConfig.setOidc(oidcConfig);
+
+        application.setInboundProtocolConfiguration(inboundProtocolsConfig);
+        application.setName(SERVICE_PROVIDER_NAME);
+        application.setIsManagementApp(true);
+
+        applicationId = addApplication(application);
+
+        oidcConfig = getOIDCInboundDetailsOfApplication(applicationId);
+
+        consumerKey = new ClientID(oidcConfig.getClientId());
+        consumerSecret = new Secret(oidcConfig.getClientSecret());
+    }
+
+    private String getAuthzHeader() {
+
+        return "Basic " + Base64.encodeBase64String((adminUsername + ":" + adminPassword).getBytes()).trim();
     }
 }

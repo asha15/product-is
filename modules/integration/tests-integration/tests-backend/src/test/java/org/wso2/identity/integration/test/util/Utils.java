@@ -63,6 +63,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
@@ -136,13 +138,20 @@ public class Utils {
     public static HttpResponse sendPOSTMessage(String sessionKey, String url, String userAgent, String
             acsUrl, String artifact, String userName, String password, HttpClient httpClient) throws Exception {
 
+        return sendPOSTMessage(sessionKey, url, userAgent, acsUrl, artifact, userName, password, httpClient,
+                SAML_SSO_URL);
+    }
+
+    public static HttpResponse sendPOSTMessage(String sessionKey, String url, String userAgent, String
+            acsUrl, String artifact, String userName, String password, HttpClient httpClient, String samlSSOUrl) throws Exception {
+
         HttpPost post = new HttpPost(url);
         post.setHeader("User-Agent", userAgent);
         post.addHeader("Referer", String.format(acsUrl, artifact));
         List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
         urlParameters.add(new BasicNameValuePair("username", userName));
         urlParameters.add(new BasicNameValuePair("password", password));
-        if (StringUtils.equals(url, SAML_SSO_URL)) {
+        if (StringUtils.equals(url, samlSSOUrl)) {
             urlParameters.add(new BasicNameValuePair("tocommonauth", "true"));
         }
         urlParameters.add(new BasicNameValuePair("sessionDataKey", sessionKey));
@@ -356,10 +365,51 @@ public class Utils {
         BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
         String resultPage = rd.lines().collect(Collectors.joining());
         List<String> attributeList = new ArrayList<>();
-        if (resultPage.contains("<div class=\"claim-list\">")) {
-            String claimString = resultPage.substring(resultPage.lastIndexOf("<div class=\"claim-list\">"));
-            String[] dataArray = StringUtils.substringsBetween(claimString, "<label for=\"", "\"");
-            Collections.addAll(attributeList, dataArray);
+        
+        String labelOpenTag = "<label for=\"";
+        String labelCloseTag = "\">";
+        
+        // Regular expression to match <div> tags containing "claim-list" class.
+        String regex = "<div[^>]*class=\"[^\"]*claim-list[^\"]*\"[^>]*>";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(resultPage);
+        
+        while (matcher.find()) {
+            int divStartIndex = matcher.start();
+            
+            // Count div tags to find the corresponding closing tag.
+            int openDivCount = 1;
+            int index = divStartIndex;
+            while (openDivCount > 0) {
+                int nextOpenDiv = resultPage.indexOf("<div", index + 1);
+                int nextCloseDiv = resultPage.indexOf("</div>", index + 1);
+                
+                // Break the loop if there are no more div tags.
+                if (nextOpenDiv == -1 && nextCloseDiv == -1) {
+                    break;
+                }
+                
+                // Check the closest next div tag (open or close).
+                if (nextCloseDiv != -1 && (nextOpenDiv == -1 || nextCloseDiv < nextOpenDiv)) {
+                    openDivCount--;
+                    index = nextCloseDiv;
+                } else if (nextOpenDiv != -1) {
+                    openDivCount++;
+                    index = nextOpenDiv;
+                }
+            }
+            
+            // Index is now at the start of the closing </div> tag of the claim-list div.
+            if (openDivCount == 0) {
+                String claimString = resultPage.substring(divStartIndex, index + 6); // 6 is length of "</div>".
+                
+                // Use a matcher to find each label within the claimString.
+                Matcher labelMatcher = Pattern.compile(labelOpenTag + "(.*?)" + labelCloseTag).matcher(claimString);
+                while (labelMatcher.find()) {
+                    // Add the extracted label (from the 'for' attribute) to the list.
+                    attributeList.add(labelMatcher.group(1));
+                }
+            }
         }
         return attributeList;
     }
@@ -452,16 +502,13 @@ public class Utils {
         return response;
     }
 
-    public static HttpResponse sendSAMLMessage(String url, Map<String, String> parameters, String userAgent, TestUserMode userMode, String tenantDomainParam, String tenantDomain, HttpClient httpClient) throws IOException {
+    public static HttpResponse sendSAMLMessage(String url, Map<String, String> parameters, String userAgent, HttpClient httpClient) throws IOException {
 
         List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
         HttpPost post = new HttpPost(url);
         post.setHeader("User-Agent", userAgent);
         for (Map.Entry<String, String> entry : parameters.entrySet()) {
             urlParameters.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
-        }
-        if (userMode == TestUserMode.TENANT_ADMIN || userMode == TestUserMode.TENANT_USER) {
-            urlParameters.add(new BasicNameValuePair(tenantDomainParam, tenantDomain));
         }
         post.setEntity(new UrlEncodedFormEntity(urlParameters));
         return httpClient.execute(post);
@@ -483,6 +530,36 @@ public class Utils {
         }
         rd.close();
         return value;
+    }
+
+    /**
+     * Extract data from response for management console requests.
+     *
+     * @param response HttpResponse
+     * @param key      key to determine the line to extract
+     * @param token    index of the value after splitting the line
+     * @return value extracted
+     * @throws IOException IOException
+     */
+    public static String extractDataFromResponseForManagementConsoleRequests(HttpResponse response, String key,
+                                                                             int token)
+            throws IOException {
+
+        try (BufferedReader bufferedReader = new BufferedReader(
+                new InputStreamReader(response.getEntity().getContent()))) {
+            String line;
+            String value = StringUtils.EMPTY;
+
+            while ((line = bufferedReader.readLine()) != null) {
+                if (line.contains(key)) {
+                    String[] tokens = line.split("\"");
+                    value = tokens[token];
+                    value = value.trim();
+                    break;
+                }
+            }
+            return value;
+        }
     }
 
     public static List<NameValuePair> getConsentRequiredClaimsFromResponse(HttpResponse response)
@@ -534,7 +611,7 @@ public class Utils {
 
         List<NameValuePair> urlParameters = new ArrayList<>();
         List<String> fetchedClaims = fetchClaimsfromConsentPage(redirectUrl);
-        for (String claimConsent: fetchedClaims) {
+        for (String claimConsent : fetchedClaims) {
             urlParameters.add(new BasicNameValuePair(claimConsent, "on"));
         }
         return urlParameters;
@@ -554,8 +631,8 @@ public class Utils {
      * Send a GET request to the data API.
      *
      * @param sessionDataKeyConsent Session data key consent
-     * @param userInfo User info
-     * @param tenantInfo Tenant info
+     * @param userInfo              User info
+     * @param tenantInfo            Tenant info
      * @return HttpResponse
      * @throws IOException IOException
      */
@@ -574,7 +651,6 @@ public class Utils {
 
         return client.execute(request);
     }
-
 
     /**
      * Read audit log lines with a given content.

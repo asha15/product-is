@@ -74,13 +74,20 @@ public enum StateEnum {
 
     private Boolean publicClient = false;
     private OAuth2PKCEConfiguration pkce;
+    private HybridFlowConfiguration hybridFlow;
     private AccessTokenConfiguration accessToken;
     private RefreshTokenConfiguration refreshToken;
+    private SubjectTokenConfiguration subjectToken;
     private IdTokenConfiguration idToken;
     private OIDCLogoutConfiguration logout;
     private Boolean validateRequestObjectSignature = false;
     private List<String> scopeValidators = null;
-
+    private ClientAuthenticationConfiguration clientAuthentication;
+    private RequestObjectConfiguration requestObject;
+    private PushAuthorizationRequestConfiguration pushAuthorizationRequest;
+    private SubjectConfiguration subject;
+    private Boolean isFAPIApplication = false;
+    private FapiMetadata fapiMetadata;
 
     /**
     **/
@@ -253,6 +260,24 @@ public enum StateEnum {
     }
 
     /**
+     **/
+    public OpenIDConnectConfiguration hybridFlow(HybridFlowConfiguration hybridFlow) {
+
+        this.hybridFlow = hybridFlow;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("hybridFlow")
+    @Valid
+    public HybridFlowConfiguration getHybridFlow() {
+        return hybridFlow;
+    }
+    public void setHybridFlow(HybridFlowConfiguration hybridFlow) {
+        this.hybridFlow = hybridFlow;
+    }
+
+    /**
     **/
     public OpenIDConnectConfiguration accessToken(AccessTokenConfiguration accessToken) {
 
@@ -286,6 +311,24 @@ public enum StateEnum {
     }
     public void setRefreshToken(RefreshTokenConfiguration refreshToken) {
         this.refreshToken = refreshToken;
+    }
+
+    /**
+     **/
+    public OpenIDConnectConfiguration subjectToken(SubjectTokenConfiguration subjectToken) {
+
+        this.subjectToken = subjectToken;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("subjectToken")
+    @Valid
+    public SubjectTokenConfiguration getSubjectToken() {
+        return subjectToken;
+    }
+    public void setSubjectToken(SubjectTokenConfiguration subjectToken) {
+        this.subjectToken = subjectToken;
     }
 
     /**
@@ -368,7 +411,114 @@ public enum StateEnum {
         return this;
     }
 
-    
+    /**
+     **/
+    public OpenIDConnectConfiguration clientAuthentication(ClientAuthenticationConfiguration clientAuthentication) {
+
+        this.clientAuthentication = clientAuthentication;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("clientAuthentication")
+    @Valid
+    public ClientAuthenticationConfiguration getClientAuthentication() {
+        return clientAuthentication;
+    }
+    public void setClientAuthentication(ClientAuthenticationConfiguration clientAuthentication) {
+        this.clientAuthentication = clientAuthentication;
+    }
+
+    /**
+     **/
+    public OpenIDConnectConfiguration requestObject(RequestObjectConfiguration requestObject) {
+
+        this.requestObject = requestObject;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("requestObject")
+    @Valid
+    public RequestObjectConfiguration getRequestObject() {
+        return requestObject;
+    }
+    public void setRequestObject(RequestObjectConfiguration requestObject) {
+        this.requestObject = requestObject;
+    }
+
+    /**
+     **/
+    public OpenIDConnectConfiguration pushAuthorizationRequest(PushAuthorizationRequestConfiguration pushAuthorizationRequest) {
+
+        this.pushAuthorizationRequest = pushAuthorizationRequest;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("pushAuthorizationRequest")
+    @Valid
+    public PushAuthorizationRequestConfiguration getPushAuthorizationRequest() {
+        return pushAuthorizationRequest;
+    }
+    public void setPushAuthorizationRequest(PushAuthorizationRequestConfiguration pushAuthorizationRequest) {
+        this.pushAuthorizationRequest = pushAuthorizationRequest;
+    }
+
+    /**
+     **/
+    public OpenIDConnectConfiguration subject(SubjectConfiguration subject) {
+
+        this.subject = subject;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("subject")
+    @Valid
+    public SubjectConfiguration getSubject() {
+        return subject;
+    }
+    public void setSubject(SubjectConfiguration subject) {
+        this.subject = subject;
+    }
+
+    /**
+     * Enabling this option will make the application FAPI conformant.
+     **/
+    public OpenIDConnectConfiguration isFAPIApplication(Boolean isFAPIApplication) {
+
+        this.isFAPIApplication = isFAPIApplication;
+        return this;
+    }
+
+    @ApiModelProperty(example = "false", value = "Enabling this option will make the application FAPI conformant.")
+    @JsonProperty("isFAPIApplication")
+    @Valid
+    public Boolean getIsFAPIApplication() {
+        return isFAPIApplication;
+    }
+    public void setIsFAPIApplication(Boolean isFAPIApplication) {
+        this.isFAPIApplication = isFAPIApplication;
+    }
+
+    /**
+     **/
+    public OpenIDConnectConfiguration fapiMetadata(FapiMetadata fapiMetadata) {
+
+        this.fapiMetadata = fapiMetadata;
+        return this;
+    }
+
+    @ApiModelProperty(value = "")
+    @JsonProperty("fapiMetadata")
+    @Valid
+    public FapiMetadata getFapiMetadata() {
+        return fapiMetadata;
+    }
+    public void setFapiMetadata(FapiMetadata fapiMetadata) {
+        this.fapiMetadata = fapiMetadata;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -388,17 +538,25 @@ public enum StateEnum {
             Objects.equals(this.allowedOrigins, openIDConnectConfiguration.allowedOrigins) &&
             Objects.equals(this.publicClient, openIDConnectConfiguration.publicClient) &&
             Objects.equals(this.pkce, openIDConnectConfiguration.pkce) &&
+            Objects.equals(this.hybridFlow, openIDConnectConfiguration.hybridFlow) &&
             Objects.equals(this.accessToken, openIDConnectConfiguration.accessToken) &&
             Objects.equals(this.refreshToken, openIDConnectConfiguration.refreshToken) &&
+            Objects.equals(this.subjectToken, openIDConnectConfiguration.subjectToken) &&
             Objects.equals(this.idToken, openIDConnectConfiguration.idToken) &&
             Objects.equals(this.logout, openIDConnectConfiguration.logout) &&
             Objects.equals(this.validateRequestObjectSignature, openIDConnectConfiguration.validateRequestObjectSignature) &&
-            Objects.equals(this.scopeValidators, openIDConnectConfiguration.scopeValidators);
+            Objects.equals(this.scopeValidators, openIDConnectConfiguration.scopeValidators) &&
+            Objects.equals(this.clientAuthentication, openIDConnectConfiguration.clientAuthentication) &&
+            Objects.equals(this.requestObject, openIDConnectConfiguration.requestObject) &&
+            Objects.equals(this.pushAuthorizationRequest, openIDConnectConfiguration.pushAuthorizationRequest) &&
+            Objects.equals(this.subject, openIDConnectConfiguration.subject) &&
+            Objects.equals(this.isFAPIApplication, openIDConnectConfiguration.isFAPIApplication) &&
+            Objects.equals(this.fapiMetadata, openIDConnectConfiguration.fapiMetadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(clientId, clientSecret, state, grantTypes, callbackURLs, allowedOrigins, publicClient, pkce, accessToken, refreshToken, idToken, logout, validateRequestObjectSignature, scopeValidators);
+        return Objects.hash(clientId, clientSecret, state, grantTypes, callbackURLs, allowedOrigins, publicClient, pkce, hybridFlow, accessToken, refreshToken, subjectToken, idToken, logout, validateRequestObjectSignature, scopeValidators, clientAuthentication, requestObject, pushAuthorizationRequest, subject, isFAPIApplication, fapiMetadata);
     }
 
     @Override
@@ -415,12 +573,20 @@ public enum StateEnum {
         sb.append("    allowedOrigins: ").append(toIndentedString(allowedOrigins)).append("\n");
         sb.append("    publicClient: ").append(toIndentedString(publicClient)).append("\n");
         sb.append("    pkce: ").append(toIndentedString(pkce)).append("\n");
+        sb.append("    hybridFlow: ").append(toIndentedString(hybridFlow)).append("\n");
         sb.append("    accessToken: ").append(toIndentedString(accessToken)).append("\n");
         sb.append("    refreshToken: ").append(toIndentedString(refreshToken)).append("\n");
+        sb.append("    subjectToken: ").append(toIndentedString(subjectToken)).append("\n");
         sb.append("    idToken: ").append(toIndentedString(idToken)).append("\n");
         sb.append("    logout: ").append(toIndentedString(logout)).append("\n");
         sb.append("    validateRequestObjectSignature: ").append(toIndentedString(validateRequestObjectSignature)).append("\n");
         sb.append("    scopeValidators: ").append(toIndentedString(scopeValidators)).append("\n");
+        sb.append("    clientAuthentication: ").append(toIndentedString(clientAuthentication)).append("\n");
+        sb.append("    requestObject: ").append(toIndentedString(requestObject)).append("\n");
+        sb.append("    pushAuthorizationRequest: ").append(toIndentedString(pushAuthorizationRequest)).append("\n");
+        sb.append("    subject: ").append(toIndentedString(subject)).append("\n");
+        sb.append("    isFAPIApplication: ").append(toIndentedString(isFAPIApplication)).append("\n");
+        sb.append("    fapiMetadata: ").append(toIndentedString(fapiMetadata)).append("\n");
         sb.append("}");
         return sb.toString();
     }

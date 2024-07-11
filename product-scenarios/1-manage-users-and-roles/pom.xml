@@ -19,7 +19,7 @@
     <parent>
         <groupId>org.wso2.is</groupId>
         <artifactId>product-scenarios</artifactId>
-        <version>5.8.0</version>
+        <version>7.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -31,8 +31,8 @@
     <modules>
         <module>1.1-admin-user-manage-roles</module>
         <module>1.2-admin-user-manage-user-accounts</module>
-        <module>1.3-user-management-with-multilayer-approval</module>
-        <module>1.4-manage-user-stores</module>
+<!--        <module>1.3-user-management-with-multilayer-approval</module>-->
+<!--        <module>1.4-manage-user-stores</module>-->
     </modules>
 
 </project>

@@ -42,6 +42,7 @@ public final class OAuth2Constant {
     public final static String REDIRECT_LOCATIONS = "http.protocol.redirect-locations";
     public final static String ACCESS_TOKEN_ENDPOINT = "https://localhost:9853/oauth2/token";
     public final static String TOKEN_REVOKE_ENDPOINT = "https://localhost:9853/oauth2/revoke";
+    public final static String PAR_ENDPOINT = "https://localhost:9853/oauth2/par";
     public final static String OAUTH2_DEFAULT_ERROR_URL = "https://localhost:9853/authenticationendpoint/" +
             "oauth2_error.do";
     public final static String USER_INFO_ENDPOINT = "https://localhost:9853/oauth2/userinfo?schema=openid";
@@ -58,6 +59,7 @@ public final class OAuth2Constant {
     public static final String OAUTH2_SCOPE_OPENID_WITH_INTERNAL_LOGIN = "openid internal_login";
     public final static String OAUTH2_SCOPE_EMAIL = "email";
     public final static String OAUTH2_SCOPE_PHONE = "phone";
+    public final static String OAUTH2_SCOPE_ADDRESS = "address";
     public final static String OAUTH2_SCOPE_PROFILE = "profile";
     public final static String OAUTH2_SCOPE_DEFAULT = "";
     public final static String OAUTH_APPLICATION_NAME = "oauthTestApplication";
@@ -109,6 +111,22 @@ public final class OAuth2Constant {
 
     public static final String SCOPE_ENDPOINT = "https://localhost:9853/api/server/v1/oidc/scopes";
     public static final String TENANT_SCOPE_ENDPOINT = "https://localhost:9853/t/wso2.com/api/server/v1/oidc/scopes";
+    public static final String OAUTH2_RESPONSE_MODE = "response_mode";
+    public static final String RESPONSE_MODE_QUERY = "query";
+    public static final String RESPONSE_MODE_FRAGMENT = "fragment";
+    public static final String RESPONSE_MODE_JWT = "jwt";
+    public static final String RESPONSE_MODE_QUERY_JWT = "query.jwt";
+    public static final String RESPONSE_MODE_FRAGMENT_JWT = "fragment.jwt";
+
+    public static final String RESPONSE_TYPE_CODE_ID_TOKEN = "code id_token";
+
+    // Tenanted urls.
+    public final static String TENANT_PLACEHOLDER = "<TENANT_PLACEHOLDER>";
+    public final static String TENANT_COMMON_AUTH_URL = "https://localhost:9853/t/<TENANT_PLACEHOLDER>/commonauth";
+    public final static String TENANT_APPROVAL_URL = "https://localhost:9853/t/<TENANT_PLACEHOLDER>/oauth2/authorize";
+    public final static String TENANT_TOKEN_ENDPOINT = "https://localhost:9853/t/<TENANT_PLACEHOLDER>/oauth2/token";
+    public static final String TENANT_INTROSPECT_ENDPOINT =
+            "https://localhost:9853/t/<TENANT_PLACEHOLDER>/oauth2/introspect";
 
     public static final class PlaygroundAppPaths {
 

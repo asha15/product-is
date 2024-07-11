@@ -42,15 +42,17 @@ import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 import org.wso2.carbon.automation.engine.context.AutomationContext;
 import org.wso2.carbon.automation.engine.context.TestUserMode;
-import org.wso2.carbon.identity.oauth.stub.dto.OAuthConsumerAppDTO;
-import org.wso2.carbon.integration.common.admin.client.AuthenticatorClient;
-import org.wso2.identity.integration.common.clients.application.mgt.ApplicationManagementServiceClient;
-import org.wso2.identity.integration.common.clients.oauth.OauthAdminClient;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationPatchModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.ApplicationResponseModel;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.AssociatedRolesConfig;
+import org.wso2.identity.integration.test.rest.api.server.application.management.v1.model.OpenIDConnectConfiguration;
+import org.wso2.identity.integration.test.utils.CarbonUtils;
 import org.wso2.identity.integration.test.utils.DataExtractUtil;
 import org.wso2.identity.integration.test.utils.OAuth2Constant;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,18 +61,19 @@ import static org.wso2.identity.integration.test.utils.DataExtractUtil.KeyValue;
 
 public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstractIntegrationTest {
 
-    private AuthenticatorClient logManger;
     private String accessToken;
     private String consumerKey;
     private String consumerSecret;
     private CloseableHttpClient client;
     private final String username;
+    private final String usernameWithoutTenantDomain;
     private final String userPassword;
     private final String activeTenant;
-    private final AutomationContext context;
     private final TestUserMode testUserMode;
 
     private static final String SYSTEM_SCOPE = "SYSTEM";
+    private static boolean isLegacyRuntimeEnabled;
+    private String applicationId;
 
     @DataProvider(name = "configProvider")
     public static Object[][] configProvider() {
@@ -82,8 +85,10 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
     @Factory(dataProvider = "configProvider")
     public SystemScopePermissionValidationTestCase(TestUserMode userMode) throws Exception {
 
-        context = new AutomationContext("IDENTITY", userMode);
+        super.init(userMode);
+        AutomationContext context = new AutomationContext("IDENTITY", userMode);
         this.username = context.getContextTenant().getTenantAdmin().getUserName();
+        this.usernameWithoutTenantDomain = context.getContextTenant().getTenantAdmin().getUserNameWithoutDomain();
         this.userPassword = context.getContextTenant().getTenantAdmin().getPassword();
         this.activeTenant = context.getContextTenant().getDomain();
         this.testUserMode = userMode;
@@ -92,25 +97,17 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
     @BeforeClass(alwaysRun = true)
     public void testInit() throws Exception {
 
-        backendURL = context.getContextUrls().getBackEndUrl();
-        logManger = new AuthenticatorClient(backendURL);
-        sessionCookie = logManger.login(username, userPassword, context.getInstance().getHosts().get("default"));
-        tenantInfo = context.getContextTenant();
-        userInfo = tenantInfo.getContextUser();
-        appMgtclient = new ApplicationManagementServiceClient(sessionCookie, backendURL, null);
-        adminClient = new OauthAdminClient(backendURL, sessionCookie);
-
         setSystemproperties();
         client = HttpClientBuilder.create().build();
+        isLegacyRuntimeEnabled = CarbonUtils.isLegacyAuthzRuntimeEnabled();
     }
 
     @AfterClass(alwaysRun = true)
     public void atEnd() throws Exception {
 
-        appMgtclient.deleteApplication(SERVICE_PROVIDER_NAME);
-        adminClient.removeOAuthApplicationData(consumerKey);
+        deleteApp(applicationId);
         client.close();
-        logManger = null;
+        restClient.closeHttpClient();
         consumerKey = null;
         accessToken = null;
     }
@@ -118,14 +115,28 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
     @Test(groups = "wso2.is", description = "Check Oauth2 application registration")
     public void testRegisterApplication() throws Exception {
 
-        OAuthConsumerAppDTO appDto = createApplication();
-        Assert.assertNotNull(appDto, "Application creation failed.");
+        ApplicationResponseModel application = addApplication();
+        Assert.assertNotNull(application, "OAuth App creation failed.");
+        applicationId = application.getId();
+        OpenIDConnectConfiguration oidcConfig = getOIDCInboundDetailsOfApplication(applicationId);
 
-        consumerKey = appDto.getOauthConsumerKey();
+        consumerKey = oidcConfig.getClientId();
         Assert.assertNotNull(consumerKey, "Application creation failed.");
 
-        consumerSecret = appDto.getOauthConsumerSecret();
+        consumerSecret = oidcConfig.getClientSecret();
         Assert.assertNotNull(consumerSecret, "Application creation failed.");
+
+        if (!isLegacyRuntimeEnabled) {
+            // Authorize few system APIs.
+            authorizeSystemAPIs(applicationId,
+                    new ArrayList<>(Arrays.asList("/api/server/v1/tenants", "/scim2/Users")));
+            // Associate roles.
+            ApplicationPatchModel applicationPatch = new ApplicationPatchModel();
+            AssociatedRolesConfig associatedRolesConfig =
+                    new AssociatedRolesConfig().allowedAudience(AssociatedRolesConfig.AllowedAudienceEnum.ORGANIZATION);
+            applicationPatch = applicationPatch.associatedRoles(associatedRolesConfig);
+            updateApplication(applicationId, applicationPatch);
+        }
     }
 
     @Test(groups = "wso2.is", description = "Send authorize user request and get access token", dependsOnMethods = "testRegisterApplication")
@@ -136,7 +147,7 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
         urlParameters.add(new BasicNameValuePair("consumerKey", consumerKey));
         urlParameters.add(new BasicNameValuePair("consumerSecret", consumerSecret));
         urlParameters.add(new BasicNameValuePair("accessEndpoint",
-                OAuth2Constant.ACCESS_TOKEN_ENDPOINT));
+                getTenantQualifiedURL(OAuth2Constant.ACCESS_TOKEN_ENDPOINT, tenantInfo.getDomain())));
         urlParameters.add(new BasicNameValuePair("authorize", OAuth2Constant.AUTHORIZE_PARAM));
         urlParameters.add(new BasicNameValuePair("scope", SYSTEM_SCOPE));
         HttpResponse response =
@@ -147,7 +158,7 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
 
         response = sendPostRequest(client, OAuth2Constant.AUTHORIZED_URL);
 
-        Map<String, Integer> keyPositionMap = new HashMap<String, Integer>(1);
+        Map<String, Integer> keyPositionMap = new HashMap<>(1);
         keyPositionMap.put("name=\"accessToken\"", 1);
 
         List<KeyValue> keyValues =
@@ -173,11 +184,12 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
         try {
             client = HttpClientBuilder.create().disableRedirectHandling().build();
             Secret password = new Secret(userPassword);
-            AuthorizationGrant passwordGrant = new ResourceOwnerPasswordCredentialsGrant(username, password);
+            AuthorizationGrant passwordGrant = new ResourceOwnerPasswordCredentialsGrant(
+                    usernameWithoutTenantDomain, password);
             ClientID clientID = new ClientID(consumerKey);
             Secret clientSecret = new Secret(consumerSecret);
             ClientAuthentication clientAuth = new ClientSecretBasic(clientID, clientSecret);
-            URI tokenEndpoint = new URI(OAuth2Constant.ACCESS_TOKEN_ENDPOINT);
+            URI tokenEndpoint = new URI(getTenantQualifiedURL(OAuth2Constant.ACCESS_TOKEN_ENDPOINT, tenantInfo.getDomain()));
             Scope systemScope = new Scope(SYSTEM_SCOPE);
             TokenRequest request = new TokenRequest(tokenEndpoint, clientAuth, passwordGrant, systemScope);
 
@@ -206,15 +218,17 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
     private void doTheScopeValidationBasedOnTheTestUserMode(String scope, boolean isClientCredentialsGrant) {
 
         if (testUserMode == TestUserMode.SUPER_TENANT_ADMIN) {
-            Assert.assertTrue(scope.contains("internal_server_admin"), "Scope should contain " +
-                    "`internal_server_admin` scope");
+            if (isLegacyRuntimeEnabled) {
+                Assert.assertTrue(scope.contains("internal_server_admin"), "Scope should contain " +
+                        "`internal_server_admin` scope");
+            }
             Assert.assertTrue(scope.contains("internal_modify_tenants"), "Scope should contain " +
                     "`internal_modify_tenants` scope");
         } else if (testUserMode == TestUserMode.TENANT_ADMIN) {
             Assert.assertFalse(scope.contains("internal_server_admin"), "Scope should not contain " +
                     "`internal_server_admin` scope");
             Assert.assertFalse(scope.contains("internal_modify_tenants"), "Scope should not contain " +
-                    "`internal_modify_tenants` scope");
+                        "`internal_modify_tenants` scope");
         } else {
             // Normal user.
             if (isClientCredentialsGrant) {
@@ -227,7 +241,7 @@ public class SystemScopePermissionValidationTestCase extends OAuth2ServiceAbstra
             Assert.assertFalse(scope.contains("internal_server_admin"), "Scope should not contain " +
                     "`internal_server_admin` scope");
             Assert.assertFalse(scope.contains("internal_modify_tenants"), "Scope should not contain " +
-                    "`internal_modify_tenants` scope");
+                        "`internal_modify_tenants` scope");
         }
     }
 }
